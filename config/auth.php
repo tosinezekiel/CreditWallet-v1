@@ -41,6 +41,11 @@ return [
             'provider' => 'users',
         ],
 
+        'investments' => [
+            'driver' => 'jwt',
+            'provider' => 'investments',
+        ],
+
         'api' => [
             'driver' => 'jwt',
             'provider' => 'users',
@@ -71,6 +76,10 @@ return [
             'model' => App\User::class,
         ],
 
+        'investments' => [
+            'driver' => 'eloquent',
+            'model' => App\Investment::class,
+        ],
         // 'users' => [
         //     'driver' => 'database',
         //     'table' => 'users',
