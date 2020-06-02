@@ -27,7 +27,8 @@ class InvestmentstartController extends Controller
         $istartdata = request()->validate([
             'amount' => 'required|integer',
             'duration' => 'required|integer|min:6',
-            'investment_start_date' => 'date'
+            'investment_start_date' => 'date',
+            'savings_id' => 'required|numeric'
         ]);
         if(request()->filled('referal_code')){
             request()->validate([
@@ -36,10 +37,10 @@ class InvestmentstartController extends Controller
             $istartdata['referal_code'] = request()->referal_code;
         }
         
-        // $imergestart = Investmentstart::create($istartdata);
+        $imergestart = Investmentstart::create($istartdata);
 
         
-        return response($istartdata);
+        return response($imergestart);
     }
 
     public function initiate(){
@@ -47,10 +48,46 @@ class InvestmentstartController extends Controller
             'amount' => 'required|integer',
             'duration' => 'required|integer|min:6',
             'investment_start_date' => 'date',
-            'rate' => 'required|numeric'
+            'savings_id' => 'required|numeric'
         ]);
         $history=array();
-        $rate = request()->rate/100;
+        $url = "https://api-main.loandisk.com/3546/4110/saving/".request()->savings_id;
+        $curl = curl_init();
+        curl_setopt_array($curl, array(
+        CURLOPT_URL => $url,
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_ENCODING => "",
+        CURLOPT_MAXREDIRS => 10,
+        CURLOPT_TIMEOUT => 30,
+        CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+        CURLOPT_CUSTOMREQUEST => "GET",
+            CURLOPT_HTTPHEADER => array(
+                "accept: application/json",
+                "cache-control: no-cache",
+                "content-type: application/json",
+                "Authorization: Basic AkMbezWYERkE5NcDsXAM7YzkxDySG9amAKvajU9d"
+            ),
+        ));
+        curl_setopt($curl, CURLOPT_SSL_VERIFYPEER, true);
+        $data = json_decode(curl_exec($curl), true); 
+        $httpcode = curl_getinfo($curl, CURLINFO_HTTP_CODE);
+        curl_close($curl);
+        $results = [];
+        $savings_account = $data['response']['Results']['0'];
+
+        if($savings_account["savings_product_id"] == "717"){
+            $irate = "3";
+        }
+ 
+        if($savings_account["savings_product_id"] == "2135"){
+            $irate = "2.5";
+        }
+ 
+        if($savings_account["savings_product_id"] == "2157"){
+            $irate = "2";
+        }
+        // return $rate;
+        $rate = $irate/100;
         $investmentstartdate = request()->investment_start_date;
         $startdateenddate =  date("Y-m-t", strtotime(request()->investment_start_date));
         $date1=date_create($investmentstartdate);
@@ -63,7 +100,7 @@ class InvestmentstartController extends Controller
         for($x=1; $x <= request()->duration; $x++){
             $date = date("Y-m-d");
             if($x == 1){
-                if($actualtenor <= 5){
+                if(date("d") > 24){
                     $month++;
                     $percentone = ($rate * $actualtenor) / $daysinamonthone;
                     $date = date('Y-m-d', strtotime('+'.$month.' months'));

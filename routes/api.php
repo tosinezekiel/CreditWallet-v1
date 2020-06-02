@@ -31,28 +31,35 @@ Route::prefix('v1')->group(function () {
     Route::post('investment/forget-password', 'InvestmentLoginController@forgotPassword');
     Route::get('investment/verify-forget-password-token', 'InvestmentLoginController@VerifyForgotPasswordToken');
     //must be guarded with investments middleware
-    Route::get('investments/dashboard', 'InvestmentController@savingsDashboard');
-    Route::get('investments/{savings_id}/savings', 'InvestmentController@savings');
+    // Route::get('investments/dashboard', 'InvestmentController@savingsDashboard');
+    // Route::get('investments/{savings_id}/single_savings', 'InvestmentController@singleSavings');
+
+    // Route::get('investments/{savings_id}/savings', 'InvestmentController@savings');
 
     
-    Route::post('investments/{savings_id}/merge', 'InvestmentController@merge');
+    // Route::post('investments/{savings_id}/merge', 'InvestmentController@merge');
     
     // Route::post('investments/{savings_id}/merge', 'InvestmentController@multiaction');
-    Route::get('investments/{savings_id}/transactions', 'InvestmentController@deleteSavingsTransactionsOfOtherMonths');
-    Route::post('investments/stage2/add', 'InvestmentController@addtransaction');
-    Route::post('investments/stage3/proceed', 'InvestmentController@calculateThisMonthInterest');
-    Route::post('investments/stage4/proceed', 'InvestmentController@calculateForStageFour');
-    Route::post('investments/stage5/proceed', 'InvestmentController@calculateForStageFive');
 
-    Route::get('generate-pdf','PDFController@generatePDF');
+    // Route::post('investments/stage1/transactions', 'InvestmentController@deleteSavingsTransactionsOfOtherMonths');
+    // Route::post('investments/stage2/add', 'InvestmentController@addtransaction');
+    // Route::post('investments/stage3/proceed', 'InvestmentController@calculateThisMonthInterest');
+    // Route::post('investments/stage4/proceed', 'InvestmentController@calculateForStageFour');
+    // Route::post('investments/stage5/proceed', 'InvestmentController@calculateForStageFive');
+
+    // Route::get('generate-pdf','PDFController@generatePDF');
+
+    // Route::get('generate-pdf2','PDFController@generatePDF2');
+
+    // Route::get('generate-lie','PDFController@generatePDFtest');
+
+    // Route::get('generate-statement','PDFController@generatePDFtest');
     
-    Route::get('generate-pdf2','PDFController@generatePDF2');
-
     
 
-    //investment start
-    Route::post('investments/merge/start', 'InvestmentstartController@create');
-    Route::post('investments/merge/initiate', 'InvestmentstartController@initiate');
+    // //investment start
+    // Route::post('investments/merge/start', 'InvestmentstartController@create');
+    // Route::post('investments/merge/initiate', 'InvestmentstartController@initiate');
 
     // Route::get('investments/merge/initiate', 'InvestmentstartController@initiate');
     
@@ -61,9 +68,44 @@ Route::prefix('v1')->group(function () {
 Route::namespace('Investment')->prefix('v1')->group(function () {
     Route::post('investments/login', 'InvestmentLoginController@login');
 });
-// Route::group(['middleware' => 'investments', 'prefix' => 'v1'],function () {
-//     Route::get('investments/dashboard', 'InvestmentController@dashboard');
-// });
+Route::group(['middleware' => 'investments', 'prefix' => 'v1'],function () {
+    // Route::get('investments/dashboard', 'InvestmentController@dashboard');
+    Route::get('investments/logout', 'InvestmentLoginController@logout');
+
+    Route::post('investments/change-password', 'InvestmentController@changePassword');
+
+    Route::get('investments/dashboard', 'InvestmentController@savingsDashboard');
+    
+    Route::get('investments/{savings_id}/single_savings', 'InvestmentController@singleSavings');
+
+    Route::get('investments/{savings_id}/savings', 'InvestmentController@savings');
+
+    
+    Route::post('investments/{savings_id}/merge', 'InvestmentController@merge');
+    
+    Route::post('investments/{savings_id}/merge', 'InvestmentController@multiaction');
+
+    Route::post('investments/stage1/transactions', 'InvestmentController@deleteSavingsTransactionsOfOtherMonths');
+    Route::post('investments/stage2/add', 'InvestmentController@addtransaction');
+    Route::post('investments/stage3/proceed', 'InvestmentController@calculateThisMonthInterest');
+    Route::post('investments/stage4/proceed', 'InvestmentController@calculateForStageFour');
+    Route::post('investments/stage5/proceed', 'InvestmentController@calculateForStageFive');
+
+    Route::get('generate-pdf','PDFController@generatePDF');
+
+    Route::get('generate-pdf2','PDFController@generatePDF2');
+
+    Route::get('generate-lie','PDFController@generatePDFtest');
+
+    Route::get('investments/{savings_id}/generate-statement','PDFController@generatePDFtest');
+    
+    
+
+    //investment start
+    Route::post('investments/merge/start', 'InvestmentstartController@create');
+    Route::post('investments/merge/initiate', 'InvestmentstartController@initiate');
+
+});
 // Route::group(['middleware' => 'jwt.auth', 'prefix' => 'v1', 'namespace' => 'Investment'], function(){
 //     // Route::get('logout', 'Api\User\UserController@logout');
 //     Route::get('investment/dashboard', 'Api\User\UserController@dashboard');

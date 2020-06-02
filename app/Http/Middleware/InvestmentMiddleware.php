@@ -22,7 +22,7 @@ class InvestmentMiddleware
     {
         //check for token
         if(! $token = JWTAuth::getToken()){
-            return response(['message' => 'unauthorized access', 'status'=>'error'], 401);
+            return response(['message' => 'Unauthorized access', 'status'=>'error'], 401);
         }
         // check if expired
         if(empty(JWTAuth::parseToken()->check())){

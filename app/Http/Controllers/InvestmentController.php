@@ -70,13 +70,13 @@ class InvestmentController extends Controller
             ];
             //storing data
             $investment = Investment::create($array);
-            return response(['data'=>$investment,'original'=>$rand], 200);
+            // return response(['data'=>$investment,'original'=>$rand], 200);
             // mailing user
             $array_data = array(
                 'from'=> 'Credit Wallet Finance<finance@mail.creditwallet.ng>',
                 'to'=> $investment->email,
                 'subject'=> "Account created successfully",
-                'html'=> "<ul><li>Username: ".$investment->username."</li><li>Password: user".$rand."</li></ul>",
+                'html'=> "<ul><li>Username: ".request()->email."</li><li>Password: ".$rand."</li></ul>",
                 'h:Reply-To'=> $investment->email
                 );
                 $session = curl_init(env('MAILGUN_URL').'/messages');
@@ -93,8 +93,7 @@ class InvestmentController extends Controller
                 $results = json_decode($response, true);
                 $results['Status'] = "success";
                 $results['Message'] = "Account Created Successfully";
-                return $results;
-              
+                return $results; 
         }else{
             $response['status'] = "error";
             $response['data'] = $data;
@@ -128,10 +127,29 @@ class InvestmentController extends Controller
         //
     }
 
+    private function getTokensPayload(){
+        $token = JWTAuth::getToken(); 
+        return JWTAuth::getPayload($token);
+    }
     public function savingsDashboard()
     {
 
-        $url = "https://api-main.loandisk.com/3546/4110/saving/borrower/1053836/from/1/count/50";
+        //check for token
+        if(! $token = JWTAuth::getToken()){
+            return response(['message' => 'unauthorized access', 'status'=>'error'], 401);
+        }
+        // check if expired
+        if(empty(JWTAuth::parseToken()->check())){
+            return response(['message' => 'expired token', 'status' => 'error'], 401);
+        }
+        // get tokens payload
+        $apy = $this->getTokensPayload();
+        $uuid = $apy['uuid'];
+
+      
+        // return $uuid->borrower_id;
+        $url = "https://api-main.loandisk.com/3546/4110/saving/borrower/".$uuid->borrower_id."/from/1/count/50";
+        // return $url;
         $curl = curl_init();
         curl_setopt_array($curl, array(
         CURLOPT_URL => $url,
@@ -153,7 +171,11 @@ class InvestmentController extends Controller
         $httpcode = curl_getinfo($curl, CURLINFO_HTTP_CODE);
         curl_close($curl);
         $results = [];
+
+        
         $savings_account = $data['response']['Results']['0'];
+
+        
         $results['total_savings'] = $savings_account;
         $i_amount = 0;
         $earn_amount = 0;
@@ -184,19 +206,52 @@ class InvestmentController extends Controller
             curl_close($curl);
             $pre_data = $data['response']['Results']['0'];
             $results['saving_transaction'] = $pre_data;
+            $x = 1;
+            $y = 1;
+            $z = 1;
+            $empty = [];
+
+
+            // $result['last_deposit'] =  [];
             for($i = 0;$i < count($pre_data); $i++){
                 if($pre_data[$i]['transaction_type_id'] === 1){
                     $results['total_investment'] = $i_amount += $pre_data[$i]['transaction_amount'];
+                    $results['last_deposit'] = $pre_data[$i]['transaction_amount'];
                 }
                 if($pre_data[$i]['transaction_type_id'] === 9){
                     $results['total_interest_earned'] = $earn_amount += $pre_data[$i]['transaction_amount'];
+                    array_push($empty,$pre_data[$i]);
                 }
                 if($pre_data[$i]['transaction_type_id'] === 14){
                     $trf_amount = $trf_amount += $pre_data[$i]['transaction_amount'];
+                    $results['next_interest'] = $pre_data[$i]['transaction_amount'];
                 }
             }
             
         }
+
+        // return $empty;
+
+        $testarray = array_map(function($a){
+            return [
+                'transaction_id' => $a['transaction_id'],
+                'savings_id' => $a['savings_id'],
+                'transaction_date' => str_replace('/','-',$a['transaction_date']),
+                'transaction_time' => $a['transaction_time'],
+                'transaction_type_id' => $a['transaction_type_id'], 
+                'transaction_amount' => $a['transaction_amount'], 
+                'transaction_description' => $a['transaction_description'],
+                'transaction_balance' => $a['transaction_balance']
+            ];
+        }, $empty);
+        // return $testarray;
+        usort($testarray, function ($a, $b) {
+            return strtotime($a['transaction_date']) - strtotime($b['transaction_date']);
+        });
+
+        $last_test = end($testarray);
+        $results['last_interest'] = $last_test['transaction_amount'];
+        
         $results['total_savings'] = $savings_account;
         $results['total_interest_recieving'] = $results['total_interest_earned'] - $trf_amount;
         $results['Status'] = "success";
@@ -214,9 +269,9 @@ class InvestmentController extends Controller
         return $results;
     }
 
-    public function deleteSavingsTransactionsOfOtherMonths($savings_id){
+    public function deleteSavingsTransactionsOfOtherMonths(){
         date_default_timezone_set('Africa/Lagos');
-        $url = "https://api-main.loandisk.com/3546/4110/saving/".$savings_id;
+        $url = "https://api-main.loandisk.com/3546/4110/saving/".request()->savings_id;
         $curl = curl_init();
         curl_setopt_array($curl, array(
         CURLOPT_URL => $url,
@@ -266,11 +321,16 @@ class InvestmentController extends Controller
         $pre_data = $data['response']['Results']['0'];
         $results['saving_transactions'] = $pre_data;     
         
-        $last_date = date('t-m-Y');
-        // return $results;
+        $investmentdate = str_replace('/','-',request()->investment_start_date);
+        
+        $startdeletingdate = date('d-m-Y',strtotime('+1 month',strtotime($investmentdate)));
+
+
+
         foreach($results['saving_transactions'] as $key){
             $new_tdate = str_replace('/', '-', $key['transaction_date']);
-                if($key['transaction_type_id'] === 9 && $new_tdate < $last_date){
+
+                if($key['transaction_type_id'] === 9 && strtotime($new_tdate) > strtotime($startdeletingdate)){
                     $url = "https://api-main.loandisk.com/3546/4110/saving_transaction/".$key['transaction_id'];
                     $curl = curl_init();
                     curl_setopt_array($curl, array(
@@ -298,13 +358,18 @@ class InvestmentController extends Controller
        return response(['message'=>'successfully Deleted', 'Status'=>'succcess'], 200);
     }
     public function addtransaction(){
+        request()->validate([
+            'amount' => 'required|integer',
+            'investment_start_date' => 'date',
+            'savings_id' => 'required|numeric'
+        ]);
         date_default_timezone_set('Africa/Lagos');
         $time = date('h:i A');
         // return $time;
-        $new_amount = $this->strtonum(request()->amount);
+        $new_amount = number_format(request()->amount,2);
         $post = [
             'savings_id' => request()->savings_id,
-            'transaction_date' => request()->investment_start_date,
+            'transaction_date' => str_replace('-','/',request()->investment_start_date),
             'transaction_time'   => $time,
             'transaction_type_id' => 1,
             'transaction_amount' => request()->amount,
@@ -336,12 +401,14 @@ class InvestmentController extends Controller
         curl_close($curl);
         return $data;
     }
+
     public function calculateThisMonthInterest(){
         request()->validate([
             'amount' => 'required|integer',
             'duration' => 'required|integer|min:6',
             'investment_start_date' => 'date',
-            'rate' => 'required|numeric'
+            'rate' => 'required|numeric',
+            'savings_id' => 'required|numeric'
         ]);
         $history=array();
         $rate = request()->rate/100;
@@ -353,29 +420,39 @@ class InvestmentController extends Controller
         $date2=date_create($startdateenddate);
         $datediff = date_diff($date1,$date2);
         $actualtenor = $datediff->days;
+
         $month = date("m",strtotime($investmentstartdate));
         $year = date("Y",strtotime($investmentstartdate));
         $daysinamonthone = cal_days_in_month(CAL_GREGORIAN,$month,$year);
+        $isday = (int) date("d",strtotime(request()->investment_start_date));
+       
+        if($isday > 24){
+            $precalc = ($actualtenor * $rate) / $daysinamonthone;
+            $interest = round($precalc * $amount, 2);
+            return response(['next_interest'=> $interest]);
+        }
         // return $daysinamonthone;
         $precalc = ($actualtenor * $rate) / $daysinamonthone;
         $interest = round($precalc * $amount, 2);
         // return $interest;
         
-        $dated = str_replace('-', '/', $investmentstartdate);
+        $dated = str_replace('-', '/', date('t-m-Y',strtotime($investmentstartdate)));
 
+        // return $dated;
         $newfmtdate = date('Y-m-t', strtotime($investmentstartdate));
         
         $txndate = str_replace('-', '/', $newfmtdate);
         // return $txndate;
-        return request()->investment_start_date;
+       
         $post = [
             'savings_id' => request()->savings_id,
             'transaction_date' => $dated,
             'transaction_time'   => date('h:i:s A'),
-            'transaction_type_id' => 1,
+            'transaction_type_id' => 9,
             'transaction_amount' => $interest,
-            'transaction_description' => 'Interest Due on '.$txndate
+            'transaction_description' => 'Interest Due on '.$dated.' for additional '.number_format(request()->amount, 2)
         ];
+        // return $post;
         $url = "https://api-main.loandisk.com/3546/4110/saving_transaction";
         $curl = curl_init();
         curl_setopt_array($curl, array(
@@ -398,11 +475,84 @@ class InvestmentController extends Controller
         $sdata = json_decode(curl_exec($curl), true); 
         $httpcode = curl_getinfo($curl, CURLINFO_HTTP_CODE);
         curl_close($curl);
-        return $sdata;
+        // return $sdata;
+        return response(['next_interest'=> 0]); 
     }
-    public function calculateForStageFour(){
-        date_default_timezone_set('Africa/Lagos');
-        $url = "https://api-main.loandisk.com/3546/4110/saving/".request()->savings_id;
+public function calculateForStageFour(){
+    date_default_timezone_set('Africa/Lagos');
+    request()->validate([
+        'amount' => 'required|integer',
+        'duration' => 'required|integer|min:6',
+        'investment_start_date' => 'date',
+        'rate' => 'required|numeric',
+        'savings_id' => 'required|numeric'
+    ]);
+    $url = "https://api-main.loandisk.com/3546/4110/saving/".request()->savings_id;
+    $curl = curl_init();
+    curl_setopt_array($curl, array(
+    CURLOPT_URL => $url,
+    CURLOPT_RETURNTRANSFER => true,
+    CURLOPT_ENCODING => "",
+    CURLOPT_MAXREDIRS => 10,
+    CURLOPT_TIMEOUT => 30,
+    CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+    CURLOPT_CUSTOMREQUEST => "GET",
+        CURLOPT_HTTPHEADER => array(
+            "accept: application/json",
+            "cache-control: no-cache",
+            "content-type: application/json",
+            "Authorization: Basic AkMbezWYERkE5NcDsXAM7YzkxDySG9amAKvajU9d"
+        ),
+    ));
+    curl_setopt($curl, CURLOPT_SSL_VERIFYPEER, true);
+    $data = json_decode(curl_exec($curl), true); 
+    $httpcode = curl_getinfo($curl, CURLINFO_HTTP_CODE);
+    curl_close($curl);
+    
+    $results = [];
+    $savings_account = $data['response']['Results']['0'];
+    
+    
+    $last_date = strtotime(date('t-m-Y',strtotime(request()->investment_start_date)));
+
+    // return $last_date;
+    // $last_date = strtotime(date('t-m-Y'));
+    $mat_date = strtotime(str_replace('/', '-', $savings_account['custom_field_1176']));
+    
+    
+    $diff = abs($last_date - $mat_date); 
+    $years = floor($diff / (365*60*60*24));  
+    $months = floor(($diff - $years * 365*60*60*24) / (30*60*60*24)); 
+    // return $months;
+    if($months < 6){
+        $newmonth = $months + request()->duration;
+        // return $newmonth;
+        strtotime(request()->investment_start_date);
+        $date = date('Y/m/d', strtotime('+'.$newmonth.' month',strtotime(request()->investment_start_date)));
+
+        $year = date('Y', strtotime($date));
+        $month = date('m', strtotime($date));
+
+        // return $year."-".$month;
+        $startdate = date($year.'-'.$month.'-01');
+        $new_date =  date($year.'-'.$month.'-t', strtotime($startdate));
+        $new_mat_date = strtotime(str_replace('-', '/', $new_date));
+        $dto = date('d-m-Y', $new_mat_date);
+        $matdate = str_replace('-', '/', $dto);
+        // return $matdate;
+        $update =  [
+            "savings_id" => $savings_account['savings_id'],
+            "savings_product_id" => $savings_account['savings_product_id'],
+            "borrower_id" => $savings_account['borrower_id'],
+            "savings_account_number" => $savings_account['savings_account_number'],
+            "savings_fees" => $savings_account['savings_fees'],
+            "savings_description" => $savings_account['savings_description'],
+            "savings_balance" => $savings_account['savings_balance'],
+            "custom_field_1176" => $matdate,
+            "custom_field_4709" => $savings_account['custom_field_4709']
+        ];
+        
+        $url = "https://api-main.loandisk.com/3546/4110/saving";
         $curl = curl_init();
         curl_setopt_array($curl, array(
         CURLOPT_URL => $url,
@@ -411,7 +561,8 @@ class InvestmentController extends Controller
         CURLOPT_MAXREDIRS => 10,
         CURLOPT_TIMEOUT => 30,
         CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
-        CURLOPT_CUSTOMREQUEST => "GET",
+        CURLOPT_CUSTOMREQUEST => "PUT",
+        CURLOPT_POSTFIELDS => json_encode($update),
             CURLOPT_HTTPHEADER => array(
                 "accept: application/json",
                 "cache-control: no-cache",
@@ -420,76 +571,24 @@ class InvestmentController extends Controller
             ),
         ));
         curl_setopt($curl, CURLOPT_SSL_VERIFYPEER, true);
-        $data = json_decode(curl_exec($curl), true); 
+        $mdata = json_decode(curl_exec($curl), true); 
         $httpcode = curl_getinfo($curl, CURLINFO_HTTP_CODE);
         curl_close($curl);
-        
-        $results = [];
-        $savings_account = $data['response']['Results']['0'];
-        
-        // return $savings_account;
-        $last_date = strtotime(date('t-m-Y'));
-        $mat_date = strtotime(str_replace('/', '-', $savings_account['custom_field_1176']));
-        
-        
-        $diff = abs($last_date - $mat_date); 
-        $years = floor($diff / (365*60*60*24));  
-        $months = floor(($diff - $years * 365*60*60*24) / (30*60*60*24)); 
-        
-        if($months < 6){
-            $newmonth = $months + request()->duration;
-            $date = date('Y/m/d', strtotime('+'.$newmonth.' month'));
-            $year = date('Y', strtotime($date));
-            $month = date('m', strtotime($date));
-            $startdate = date($year.'-'.$month.'-01');
-            $new_date =  date($year.'-'.$month.'-t', strtotime($startdate));
-            $new_mat_date = strtotime(str_replace('-', '/', $new_date));
-            $dto = date('Y-m-d', $new_mat_date);
-            $matdate = str_replace('-', '/', $dto);
-
-
-
-              $update =  [
-                "savings_id" => $savings_account['savings_id'],
-                "savings_product_id" => $savings_account['savings_product_id'],
-                "borrower_id" => $savings_account['borrower_id'],
-                "savings_account_number" => $savings_account['savings_account_number'],
-                "savings_fees" => $savings_account['savings_fees'],
-                "savings_description" => $savings_account['savings_description'],
-                "savings_balance" => $savings_account['savings_balance'],
-                "custom_field_1176" => $matdate,
-                "custom_field_4709" => $savings_account['custom_field_4709']
-            ];
-            
-            $url = "https://api-main.loandisk.com/3546/4110/saving";
-            $curl = curl_init();
-            curl_setopt_array($curl, array(
-            CURLOPT_URL => $url,
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_ENCODING => "",
-            CURLOPT_MAXREDIRS => 10,
-            CURLOPT_TIMEOUT => 30,
-            CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
-            CURLOPT_CUSTOMREQUEST => "PUT",
-            CURLOPT_POSTFIELDS => json_encode($update),
-                CURLOPT_HTTPHEADER => array(
-                    "accept: application/json",
-                    "cache-control: no-cache",
-                    "content-type: application/json",
-                    "Authorization: Basic AkMbezWYERkE5NcDsXAM7YzkxDySG9amAKvajU9d"
-                ),
-            ));
-            curl_setopt($curl, CURLOPT_SSL_VERIFYPEER, true);
-            $mdata = json_decode(curl_exec($curl), true); 
-            $httpcode = curl_getinfo($curl, CURLINFO_HTTP_CODE);
-            curl_close($curl);
         }
         
-        return $mdata;
+        return ['Status' => 'Success'];
     }
     public function calculateForStageFive(){
         date_default_timezone_set('Africa/Lagos');
-        $td = request()->investment_start_date;
+        request()->validate([
+            'amount' => 'required|integer',
+            'duration' => 'required|integer|min:6',
+            'investment_start_date' => 'date',
+            'rate' => 'required|numeric',
+            'savings_id' => 'required|numeric',
+            'current_interest' => 'required|numeric'
+        ]);
+        $investmentstartdate = request()->investment_start_date;
         // return $td;
         // $ttt = strtotime(str_replace('/', '-', $td));
         // $tf = str_replace('-', '/', $td);
@@ -520,6 +619,7 @@ class InvestmentController extends Controller
         curl_close($curl);
         $results = [];
         $savings_account = $data['response']['Results']['0'];
+    
         
         
 
@@ -555,21 +655,44 @@ class InvestmentController extends Controller
         
         
         $interest = $rate * $amt;
+
+
+
+        // return request()->current_interest."-".$interest."-".$amt;
         
 
         $last_date = strtotime(str_replace('/', '-', request()->investment_start_date));
-        $mat_date = strtotime(str_replace('/', '-', $savings_account['custom_field_1176']));
+        //$mat_date = strtotime(str_replace('/', '-', $savings_account['custom_field_1176']));
+        $mat_date  = date('d-m-Y', strtotime( str_replace('/', '-',$savings_account["custom_field_1176"])));
+
+        // return date('d/m/Y',$mat_date);
+        // $diff = abs($last_date - $mat_date); 
+        // $years = floor($diff / (365*60*60*24));  
+        // $months = floor(($diff - $years * 365*60*60*24) / (30*60*60*24)); 
         
-        $diff = abs($last_date - $mat_date); 
-        $years = floor($diff / (365*60*60*24));  
-        $months = floor(($diff - $years * 365*60*60*24) / (30*60*60*24)); 
+        // $startdate = date('d-m-Y', strtotime(request()->investment_start_date));
         
-        for($x=1; $x <= $months; $x++){
-            $ttt = strtotime($td);
+        // $date1=date_create($startdate);
+        // $date2=date_create($mat_date);
+        // $datediff = date_diff($date1,$date2);
+        // $actualtenor = $datediff;
+
+        // // return $datediff;
+        // print_r($datediff);
+        // die();
+        
+        for($x=1; $x <= 12; $x++){
+            if($x==1){
+                $interest = request()->current_interest + ($rate * $amt);
+            }
+            $ttt = strtotime($investmentstartdate);
             
-            $dt = date('Y-m-t', strtotime('+'.$x.' month',$ttt));
+            $dt = date('t-m-Y', strtotime('+'.$x.' month',$ttt));
             
             $txndate = str_replace('-', '/', $dt);
+
+        //     return $txndate;
+        // break;
             
             $post = [
                 'savings_id' => request()->savings_id,
@@ -601,10 +724,97 @@ class InvestmentController extends Controller
             $sdata = json_decode(curl_exec($curl), true); 
             $httpcode = curl_getinfo($curl, CURLINFO_HTTP_CODE);
             curl_close($curl);
+
+            return $sdata;
             
         }
         
-        return $sdata;
+        return $data;
+    }
+    public function singleSavings($savings_id){
+        $url = "https://api-main.loandisk.com/3546/4110/saving/".$savings_id;
+        $curl = curl_init();
+        curl_setopt_array($curl, array(
+        CURLOPT_URL => $url,
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_ENCODING => "",
+        CURLOPT_MAXREDIRS => 10,
+        CURLOPT_TIMEOUT => 30,
+        CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+        CURLOPT_CUSTOMREQUEST => "GET",
+            CURLOPT_HTTPHEADER => array(
+                "accept: application/json",
+                "cache-control: no-cache",
+                "content-type: application/json",
+                "Authorization: Basic AkMbezWYERkE5NcDsXAM7YzkxDySG9amAKvajU9d"
+            ),
+        ));
+        curl_setopt($curl, CURLOPT_SSL_VERIFYPEER, true);
+        $data = json_decode(curl_exec($curl), true); 
+        $httpcode = curl_getinfo($curl, CURLINFO_HTTP_CODE);
+        curl_close($curl);
+        $results = [];
+        $savings_account = $data['response']['Results']['0'];
+        $results['savings'] = $savings_account;
+        $savings_transactions = $this->getSingleSavingsTransactions($savings_id);
+        
+        usort($savings_transactions, function ($a, $b) {
+            return strtotime(str_replace('/','-',$a['transaction_date'])) - strtotime(str_replace('/','-',$b['transaction_date']));
+        });
+        $fmttxn = array_map(function($a){
+            return [
+                'date' => str_replace('-','/',$a['transaction_date'])." ".$a['transaction_time'],
+                'transaction' => $a['transaction_type_id'],
+                'description' => $a['transaction_description'], 
+                'debit' => ($a['transaction_type_id'] === 14) ? $a['transaction_amount'] : '',
+                'credit' => ($a['transaction_type_id'] === 1 || $a['transaction_type_id'] === 9) ? $a['transaction_amount'] : '',
+                'balance' => $a['transaction_balance']
+            ];
+        }, $savings_transactions);
+        // return $results;
+        $results['saving_transactions'] = $fmttxn;
+
+        return $results;
+    }
+    public function changePassword(){
+        request()->validate([
+            'oldpassword' => 'required',
+            'password' => 'required|string|min:6|confirmed',
+        ]);
+        // get tokens payload
+        $apy = $this->getTokensPayload();
+        $uuid = $apy['uuid'];
+
+        if(!Hash::check(request()->oldpassword, $uuid->password)){
+            return response(['message' => 'current password is invalid or wrongly typed', 'status'=>'error'], 401);
+        }
+        $hashedpassword = Hash::make(request()->password);
+        $investment = Investment::whereEmail($uuid->email)->wherePassword($uuid->password)->first();
+
+        $investment->update(['password'=>$hashedpassword]);
+
+        $customClaims = $this->createCustomClaim($investment);
+
+        $factory = JWTFactory::customClaims([
+            'sub'   => env('APP_KEY'),
+            'uuid' =>  $customClaims
+        ]);
+
+        $payload = $factory->make();
+        $token = JWTAuth::encode($payload);
+
+        return response(['message' => 'password updated successfully', 'status' => 'success', 'token' => "{$token}"], 200);
+
+    }
+
+    private function createCustomClaim($data){
+        date_default_timezone_set('Africa/Lagos');
+        $now = Carbon::now();
+
+        $customClaims = $data;
+        $customClaims['now'] = $now->format('Y-m-d H:i:s');
+        $customClaims['expiry'] = $now->addHour(6)->format('Y-m-d H:i:s');
+        return $customClaims;
     }
     public function merge($savings_id){
         $this->validateAmountAndDuration();

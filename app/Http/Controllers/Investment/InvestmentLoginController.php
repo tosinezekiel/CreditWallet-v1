@@ -17,14 +17,14 @@ class InvestmentLoginController extends Controller
         // $this->checkEmailOnLoandDisk();
         $this->validateUsernameAndPassword();
         
-        if(!Investment::where('username',$request->username)->exists()){
+        if(!Investment::where('email',$request->email)->exists()){
+            return response(['message'=>'invalid credential', 'Status'=>'error'], 401);
+        }
+        if(!$this->verifyUser(request()->email,request()->password)){
             return response(['message'=>'invalid credentials', 'Status'=>'error'], 401);
         }
-        if(!$this->verifyUser(request()->username,request()->password)){
-            return response(['message'=>'invalid credentials', 'Status'=>'error'], 401);
-        }
-        $hashedpassword = $this->getHashedPassword(request()->username);
-        $investment = Investment::where('username',request()->username)->where('password',$hashedpassword)->first();
+        $hashedpassword = $this->getHashedPassword(request()->email);
+        $investment = Investment::where('email',request()->email)->where('password',$hashedpassword)->first();
         // check email on loan disk;
         if($this->checkEmailOnLoandDisk($investment->email)){
             return response(['message'=>'user email not found on loanDisk', 'Status'=>'error'], 404);
@@ -39,7 +39,7 @@ class InvestmentLoginController extends Controller
         $payload = $factory->make();
         $token = JWTAuth::encode($payload);
 
-        return response(['data' => $investment, 'Status' => 'success', 'token' => "{$token}"], 200);
+        return response(['data' => $investment, 'status' => 'success', 'token' => "{$token}"], 200);
 
     }
     public function forgotPassword(){
@@ -82,6 +82,13 @@ class InvestmentLoginController extends Controller
                 return $results;
     }
 
+    public function logout(){
+        JWTAuth::invalidate(JWTAuth::getToken());
+        return response()->json([
+            'status' => 'success',
+            'message' => 'logout'
+        ], 200);
+    }
     public function VerifyForgotPasswordToken(Request $request){
         $this->validateEmailAddress();
         if(!Investment::where('email',request()->email)->exists()){
@@ -104,6 +111,12 @@ class InvestmentLoginController extends Controller
         return response(['message' => 'password reset successful', 'status' => 'success'], 200);
     }
 
+    
+
+    private function getTokensPayload(){
+        $token = JWTAuth::getToken(); 
+        return JWTAuth::getPayload($token);
+    }
     public function checkEmailOnLoandDisk($email){
         // return false;
         // return "hey";
@@ -137,7 +150,7 @@ class InvestmentLoginController extends Controller
         return false;
     }
     public function getHashedPassword($username){
-        $investment = Investment::whereUsername($username)->first();
+        $investment = Investment::whereEmail($username)->first();
         return $investment->password;
     }
     private function createCustomClaims($data){
@@ -155,7 +168,7 @@ class InvestmentLoginController extends Controller
             return false;
         }
         return true;
-        return Investment::where('username',$username)->where('password',$hashedpassword)->exist();
+        // return Investment::where('email',$username)->where('password',$hashedpassword)->exists();
     }
     private function validateEmailAddress()
     {
@@ -167,7 +180,7 @@ class InvestmentLoginController extends Controller
     private function validateUsernameAndPassword()
     {
         return request()->validate([
-            'username'  => 'required|string',
+            'email'  => 'required|string',
             'password'  => 'required'
         ]);
     }

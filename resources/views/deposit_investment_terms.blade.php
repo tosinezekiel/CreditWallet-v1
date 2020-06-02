@@ -161,8 +161,14 @@
             
             
                 <p>
-                    Your next interest payment of NGN  {{$firstinterest}} (i.e. NGN 7,741.94 on NGN 1m for 8 days in May 2020, NGN 43,548.39 on NGN 3m
-                     for 15 days in May 2020 and NGN 30,000 on NGN 1m in May 2020) will be made on or before {{$investmentenddate}}. Thereafter, you’ll receive monthly interest payments of NGN {{$successiveinterest}} at the end of each successive month.  
+                    Your next interest payment of NGN  {{$firstinterest}} will be made on or before {{$investmentenddate}}, kindly see details below : 
+                    <ul>
+                        <li>NGN 7,741.94 on NGN 1m for 8 days on May 22, 2020</li>
+                        <li>NGN 7,741.94 on NGN 1m for 8 days on May 22, 2020</li>
+                        <li>NGN 7,741.94 on NGN 1m for 8 days on May 22, 2020</li>
+                    </ul>
+                    
+                    Thereafter, you’ll receive monthly interest payments of NGN {{$successiveinterest}} at the end of each successive month.  
                </p>
             
           

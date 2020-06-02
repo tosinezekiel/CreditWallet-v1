@@ -63,7 +63,7 @@
             </div>
             <div class="right-to-left">
                 <span class="left">Credit Wallet</span>
-                <span class="right">Date: 27/05/2020 <br>{{$savings_account['acc_name']}}</span>
+                <span class="right">Date: 27/05/2020 <br>{{request()->name}}</span>
             </div>
             <div class="clear"></div>
             <div class="simple-header">SAVINGS ACCOUNT</div>
@@ -89,9 +89,9 @@
                 
                 <tr>
                     <td align="center">{{ $savings_account['savings_account_number'] }}</td>
-                    <td align="center">36.0</td>
-                    <td align="center">{{ number_format($savings_account['savings_balance'])}}</td>
-                    <td align="center">{{ number_format($savings_account['savings_balance'])}}</td>
+                    <td align="center">{{ $savings_account['rate_per_annum'] }}</td>
+                    <td align="center">{{ number_format($savings_account['savings_balance'],2)}}</td>
+                    <td align="center">{{ number_format($savings_account['savings_balance'],2)}}</td>
                 </tr>
             </Table>
             <div class="simple-header">TRANSACTIONS</div>
@@ -105,38 +105,38 @@
                     <th>Balance</th>
                 </tr>
                 @php $amount = 0; @endphp
-                @foreach($new_array as $txn)
+                @foreach($testarray as $txn)
                     <tr>
-                        <td align="left">{{ $txn['transaction_date'] }}<br>
+                        <td align="left">{{ str_replace('-','/',$txn['transaction_date']) }}<br>
                             {{$txn['transaction_time']}}</td>
                         <td align="left">
                             @if($txn['transaction_type_id'] === 1)
                                 Deposit
                             @elseif($txn['transaction_type_id'] === 9)
-                                Transfer Out
-                            @elseif($txn['transaction_type_id'] === 14)
                                 Interest
+                            @elseif($txn['transaction_type_id'] === 14)
+                                Transfer Out
                             @endif
                         </td>
                         <td align="left">{{$txn['transaction_description']}}</td>
                         <td align="left">
-                            @if($txn['transaction_type_id'] === 9)
-                                {{number_format($txn['transaction_amount'])}}
+                            @if($txn['transaction_type_id'] === 14)
+                                {{number_format($txn['transaction_amount'],2)}}
                             @endif
                         </td>
                         <td align="left">
-                            @if($txn['transaction_type_id'] === 1 || $txn['transaction_type_id'] === 14)
-                                {{number_format($txn['transaction_amount'])}}
+                            @if($txn['transaction_type_id'] === 1 || $txn['transaction_type_id'] === 9)
+                                {{number_format($txn['transaction_amount'],2)}}
                             @endif
                         </td>
                         <td align="left">
                             @php
-                                if($txn['transaction_type_id'] === 1 || $txn['transaction_type_id'] === 14){
+                                if($txn['transaction_type_id'] === 1 || $txn['transaction_type_id'] === 9){
                                     $amount = $amount + $txn['transaction_amount'];
-                                    echo number_format($amount);
-                                }else if($txn['transaction_type_id'] === 9){
+                                    echo number_format($amount,2);
+                                }else if($txn['transaction_type_id'] === 14){
                                     $amount = $amount - $txn['transaction_amount'];
-                                    echo number_format($amount);
+                                    echo number_format($amount,2);
                                 }
                             @endphp
                         </td>

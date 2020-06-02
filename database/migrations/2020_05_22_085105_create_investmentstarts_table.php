@@ -19,6 +19,7 @@ class CreateInvestmentstartsTable extends Migration
             $table->integer('duration');
             $table->string('referal_code')->nullable();
             $table->string('investment_start_date');
+            $table->integer('savings_id');
             $table->timestamps();
         });
     }
