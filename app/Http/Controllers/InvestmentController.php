@@ -134,6 +134,10 @@ class InvestmentController extends Controller
     public function savingsDashboard()
     {
 
+        $notification = array(
+            'message' => "Due to the high volume of deposit investments that we have received recently, please note that we are currently not accepting deposit investments at this point. However, the investment platform will be available from 30th June, 2020. Thank you for choosing Princeps Credit Systems Limited",
+            'status' => 1
+        );
         //check for token
         if(! $token = JWTAuth::getToken()){
             return response(['message' => 'unauthorized access', 'status'=>'error'], 401);
@@ -181,8 +185,27 @@ class InvestmentController extends Controller
         $earn_amount = 0;
         $trf_amount = 0;
         $gTrf_ammount = "";
+        $maturity = [];
         foreach($savings_account as $value){
             $savings_id = $value['savings_id'];
+            $maturity_date = date('d-m-Y', strtotime( str_replace('/', '-',$value["custom_field_1176"])));
+            $date1 = date('d-m-Y');
+            $date2 = $maturity_date;
+            
+            $ts1 = strtotime($date1);
+            $ts2 = strtotime($date2);
+            
+            $year1 = date('Y', $ts1);
+            $year2 = date('Y', $ts2);
+            
+            $month1 = date('m', $ts1);
+            $month2 = date('m', $ts2);
+            
+            $diff = (($year2 - $year1) * 12) + ($month2 - $month1);
+			$maturity[] = array(
+			    'maturity_month' => $diff,
+			    'savings_account' => $value
+			);
             $url = "https://api-main.loandisk.com/3546/4110/saving_transaction/saving/".$savings_id."/from/1/count/50";
             $curl = curl_init();
             curl_setopt_array($curl, array(
@@ -205,55 +228,93 @@ class InvestmentController extends Controller
             $httpcode = curl_getinfo($curl, CURLINFO_HTTP_CODE);
             curl_close($curl);
             $pre_data = $data['response']['Results']['0'];
-            $results['saving_transaction'] = $pre_data;
             $x = 1;
             $y = 1;
             $z = 1;
             $empty = [];
-
-
+            
+            $all_deposit = [];
+            $all_last_interest = [];
+            $all_next_interest = [];
+  
             // $result['last_deposit'] =  [];
-            for($i = 0;$i < count($pre_data); $i++){
-                if($pre_data[$i]['transaction_type_id'] === 1){
-                    $results['total_investment'] = $i_amount += $pre_data[$i]['transaction_amount'];
-                    $results['last_deposit'] = $pre_data[$i]['transaction_amount'];
+            $total_interest_recievable = $total_interest_earned = $last_interest = $next_interest = 0;
+            foreach($pre_data as $value){
+                
+                $transfer_out_payment_date = date('28-m-Y');
+                $last_day_of_month = date('t-m-Y');
+                if($value['transaction_type_id'] === 1){
+                    $results['total_investment'] = $i_amount += $value['transaction_amount'];
+                    $results['last_deposit'] = $value['transaction_amount'];
+                    $all_deposit[] = $value;
                 }
-                if($pre_data[$i]['transaction_type_id'] === 9){
-                    $results['total_interest_earned'] = $earn_amount += $pre_data[$i]['transaction_amount'];
-                    array_push($empty,$pre_data[$i]);
+                
+                if($value['transaction_type_id'] === 9){
+                   
+                    
+                    $transactiondate = date('d-m-Y', strtotime( str_replace('/', '-',$value["transaction_date"])));
+			
+        			if( strtotime($transactiondate) >= time() ){
+        			    $total_interest_recievable = $total_interest_recievable + $value["transaction_amount"];
+        				$all_next_interest[] = $value;
+        			}
+        			
+        			
+        			if(date("d") <= 28){
+        			    if ($transactiondate == $last_day_of_month){
+                            $next_interest = $next_interest + $value['transaction_amount'];
+                        }
+        			}else{
+        			    $lastDateOfNextMonth =strtotime('last day of next month') ;
+
+                        $last_next_month_day = date('d-m-Y', $lastDateOfNextMonth);
+                        if ($transactiondate == $last_next_month_day){
+                            $next_interest = $next_interest + $value['transaction_amount'];
+                        }
+        			}
+        			
+        			
                 }
-                if($pre_data[$i]['transaction_type_id'] === 14){
-                    $trf_amount = $trf_amount += $pre_data[$i]['transaction_amount'];
-                    $results['next_interest'] = $pre_data[$i]['transaction_amount'];
+                
+                if($value['transaction_type_id'] === 14){
+                     
+                    $transactiondate = date('d-m-Y', strtotime( str_replace('/', '-',$value["transaction_date"])));
+			
+        			if( strtotime($transactiondate) <= time() ){
+        				$all_last_interest[] = $value;
+        				$total_interest_earned = $total_interest_earned + $value["transaction_amount"];
+        			}
+        			
+        			if(date("d") <= 28){
+        			    $date = date('Y-m-d', strtotime('- 1 months'));
+                    	$year = date('Y', strtotime($date));
+                    	$month = date('m', strtotime($date));
+                    	$last_interest_payment_date = date("28-".$month."-".$year);
+        			    if ($transactiondate == $last_interest_payment_date){
+                            $last_interest = $last_interest + $value['transaction_amount'];
+                        }
+        			}else{
+        			    $last_interest_payment_date = date("28-m-Y");
+        			    if ($transactiondate == $last_interest_payment_date){
+                            $last_interest = $last_interest + $value['transaction_amount'];
+                        }
+        			}
                 }
+                
             }
             
         }
-
-        // return $empty;
-
-        $testarray = array_map(function($a){
-            return [
-                'transaction_id' => $a['transaction_id'],
-                'savings_id' => $a['savings_id'],
-                'transaction_date' => str_replace('/','-',$a['transaction_date']),
-                'transaction_time' => $a['transaction_time'],
-                'transaction_type_id' => $a['transaction_type_id'], 
-                'transaction_amount' => $a['transaction_amount'], 
-                'transaction_description' => $a['transaction_description'],
-                'transaction_balance' => $a['transaction_balance']
-            ];
-        }, $empty);
-        // return $testarray;
-        usort($testarray, function ($a, $b) {
-            return strtotime($a['transaction_date']) - strtotime($b['transaction_date']);
-        });
-
-        $last_test = end($testarray);
-        $results['last_interest'] = $last_test['transaction_amount'];
         
+        $results['all_next_interest'] = $all_next_interest;
+        $results['all_last_interest'] = $all_last_interest;
+        $results['all_deposit'] = $all_deposit;
+        $results['maturity'] = $maturity;
+        $results['notification'] = $notification;
+        $results['last_interest'] = $last_interest;
+        $results['next_interest'] = $next_interest;
         $results['total_savings'] = $savings_account;
-        $results['total_interest_recieving'] = $results['total_interest_earned'] - $trf_amount;
+        $results['total_interest_recievable'] = $total_interest_recievable;
+        $results['total_interest_earned'] = $total_interest_earned;
         $results['Status'] = "success";
         return $results;
     }
@@ -293,11 +354,23 @@ class InvestmentController extends Controller
         $httpcode = curl_getinfo($curl, CURLINFO_HTTP_CODE);
         curl_close($curl);
         $results = [];
+        if(!empty($data['error'])){
+            return response(['status' => 'Error','message' => 'Savings not found!'], 404);
+        }else{
+            $savings_account = $data["response"]["Results"]["0"];
+            if($savings_account === null){
+                return response(['status' => 'Error','message' => 'Savings not found!'], 404);
+            }
+        }
+    
         $savings_account = $data['response']['Results']['0'];
         // $results['savings'] = $savings_account;
 
         $savings_id = $savings_account['savings_id'];
+
+        
         $url = "https://api-main.loandisk.com/3546/4110/saving_transaction/saving/".$savings_id."/from/1/count/50";
+
         $curl = curl_init();
         curl_setopt_array($curl, array(
         CURLOPT_URL => $url,
@@ -319,6 +392,7 @@ class InvestmentController extends Controller
         $httpcode = curl_getinfo($curl, CURLINFO_HTTP_CODE);
         curl_close($curl);
         $pre_data = $data['response']['Results']['0'];
+        // return $pre_data;
         $results['saving_transactions'] = $pre_data;     
         
         $investmentdate = str_replace('/','-',request()->investment_start_date);
@@ -359,7 +433,7 @@ class InvestmentController extends Controller
     }
     public function addtransaction(){
         request()->validate([
-            'amount' => 'required|integer',
+            'amount' => 'required|numeric',
             'investment_start_date' => 'date',
             'savings_id' => 'required|numeric'
         ]);
@@ -376,8 +450,10 @@ class InvestmentController extends Controller
             'transaction_description' => 'Additional Deposit of '.$new_amount
         ];
         $url = "https://api-main.loandisk.com/3546/4110/saving_transaction";
+
+        // return $post;
         $curl = curl_init();
-        
+      
         curl_setopt_array($curl, array(
         CURLOPT_URL => $url,
         CURLOPT_RETURNTRANSFER => true,
@@ -399,12 +475,21 @@ class InvestmentController extends Controller
         $data = json_decode(curl_exec($curl), true); 
         $httpcode = curl_getinfo($curl, CURLINFO_HTTP_CODE);
         curl_close($curl);
+        $results = [];
+        if(!empty($data['error'])){
+            return response(['status' => 'Error','message' => 'result not found!'], 404);
+        }else{
+            $result = $data["response"]["Results"]["0"];
+            if($result === null){
+                return response(['status' => 'Error','message' => 'result not found!'], 404);
+            }
+        }
         return $data;
     }
 
     public function calculateThisMonthInterest(){
         request()->validate([
-            'amount' => 'required|integer',
+            'amount' => 'required|numeric',
             'duration' => 'required|integer|min:6',
             'investment_start_date' => 'date',
             'rate' => 'required|numeric',
@@ -420,7 +505,7 @@ class InvestmentController extends Controller
         $date2=date_create($startdateenddate);
         $datediff = date_diff($date1,$date2);
         $actualtenor = $datediff->days;
-
+        
         $month = date("m",strtotime($investmentstartdate));
         $year = date("Y",strtotime($investmentstartdate));
         $daysinamonthone = cal_days_in_month(CAL_GREGORIAN,$month,$year);
@@ -481,7 +566,7 @@ class InvestmentController extends Controller
 public function calculateForStageFour(){
     date_default_timezone_set('Africa/Lagos');
     request()->validate([
-        'amount' => 'required|integer',
+        'amount' => 'required|numeric',
         'duration' => 'required|integer|min:6',
         'investment_start_date' => 'date',
         'rate' => 'required|numeric',
@@ -508,8 +593,15 @@ public function calculateForStageFour(){
     $data = json_decode(curl_exec($curl), true); 
     $httpcode = curl_getinfo($curl, CURLINFO_HTTP_CODE);
     curl_close($curl);
-    
     $results = [];
+        if(!empty($data['error'])){
+            return response(['status' => 'Error','message' => 'Savings not found!'], 404);
+        }else{
+            $savings_account = $data["response"]["Results"]["0"];
+            if($savings_account === null){
+                return response(['status' => 'Error','message' => 'Savings not found!'], 404);
+            }
+        }
     $savings_account = $data['response']['Results']['0'];
     
     
@@ -618,6 +710,14 @@ public function calculateForStageFour(){
         $httpcode = curl_getinfo($curl, CURLINFO_HTTP_CODE);
         curl_close($curl);
         $results = [];
+        if(!empty($data['error'])){
+            return response(['status' => 'Error','message' => 'Savings not found!'], 404);
+        }else{
+            $savings_account = $data["response"]["Results"]["0"];
+            if($savings_account === null){
+                return response(['status' => 'Error','message' => 'Savings not found!'], 404);
+            }
+        }
         $savings_account = $data['response']['Results']['0'];
     
         
@@ -662,7 +762,7 @@ public function calculateForStageFour(){
         
 
         $last_date = strtotime(str_replace('/', '-', request()->investment_start_date));
-        //$mat_date = strtotime(str_replace('/', '-', $savings_account['custom_field_1176']));
+        // $mat_date = strtotime(str_replace('/', '-', $savings_account['custom_field_1176']));
         $mat_date  = date('d-m-Y', strtotime( str_replace('/', '-',$savings_account["custom_field_1176"])));
 
         // return date('d/m/Y',$mat_date);
@@ -670,18 +770,22 @@ public function calculateForStageFour(){
         // $years = floor($diff / (365*60*60*24));  
         // $months = floor(($diff - $years * 365*60*60*24) / (30*60*60*24)); 
         
-        // $startdate = date('d-m-Y', strtotime(request()->investment_start_date));
-        
-        // $date1=date_create($startdate);
-        // $date2=date_create($mat_date);
-        // $datediff = date_diff($date1,$date2);
-        // $actualtenor = $datediff;
 
-        // // return $datediff;
-        // print_r($datediff);
-        // die();
+        // return $months;
+        $startdate = date('d-m-Y', strtotime(request()->investment_start_date));
         
-        for($x=1; $x <= 12; $x++){
+        $date1=date_create($startdate);
+        $date2=date_create($mat_date);
+        $datediff = date_diff($date1,$date2);
+        $actualtenor = $datediff;
+
+        $months = $datediff->m;
+        if($months === 0){
+            $months = $datediff->y * 12;
+        }
+        // return $months;
+        
+        for($x=1; $x <= $months; $x++){
             if($x==1){
                 $interest = request()->current_interest + ($rate * $amt);
             }
@@ -725,8 +829,8 @@ public function calculateForStageFour(){
             $httpcode = curl_getinfo($curl, CURLINFO_HTTP_CODE);
             curl_close($curl);
 
-            return $sdata;
-            
+            // return $sdata;
+            // sleep(30);
         }
         
         return $data;
@@ -947,6 +1051,43 @@ public function calculateForStageFour(){
         curl_close($curl);
         $pre_data = $data['response']['Results']['0'];
         return $pre_data;
+    }
+
+    public function getSingleSavingsTransactionsTest(){
+        $url = "https://api-main.loandisk.com/3546/4110/saving_transaction/saving/".request()->savings_id."/from/1/count/50";
+        $curl = curl_init();
+        curl_setopt_array($curl, array(
+        CURLOPT_URL => $url,
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_ENCODING => "",
+        CURLOPT_MAXREDIRS => 10,
+        CURLOPT_TIMEOUT => 30,
+        CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+        CURLOPT_CUSTOMREQUEST => "GET",
+            CURLOPT_HTTPHEADER => array(
+                "accept: application/json",
+                "cache-control: no-cache",
+                "content-type: application/json",
+                "Authorization: Basic AkMbezWYERkE5NcDsXAM7YzkxDySG9amAKvajU9d"
+            ),
+        ));
+        curl_setopt($curl, CURLOPT_SSL_VERIFYPEER, true);
+        $data = json_decode(curl_exec($curl), true); 
+        $httpcode = curl_getinfo($curl, CURLINFO_HTTP_CODE);
+        curl_close($curl);
+        $pre_data = $data['response']['Results']['0'];
+        
+        $m = date('m',strtotime(request()->investment_start_date));
+        // return $m;
+        $results = [];
+        foreach($pre_data as $txn){
+            $fmtdate = str_replace('/','-',$txn['transaction_date']);
+            $txnmonth = date('m',strtotime($fmtdate));
+            if($txn['transaction_type_id'] === 9 && $txnmonth === $m){
+                array_push($results,$txn);
+            }
+        }
+        return $results;
     }
     public function edit($id)
     {

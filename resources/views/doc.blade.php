@@ -24,7 +24,7 @@
                 line-height: 30px;
             }
             table { 
-                border-collapse: collapse; 
+                border-collapse: collapse;
                 font-size:13px;
             }
             th:nth-child(n) { 

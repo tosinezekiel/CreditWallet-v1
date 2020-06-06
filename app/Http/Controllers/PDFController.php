@@ -34,7 +34,56 @@ class PDFController extends Controller
         $httpcode = curl_getinfo($curl, CURLINFO_HTTP_CODE);
         curl_close($curl);
         
-        $savings_account = $data['response']['Results']['0'];
+        if(!empty($data['error'])){
+            return response(['status' => 'Error','message' => 'result not found!'], 404);
+        }
+        if(empty($data)){
+            return response(['status' => 'Error','message' => 'Bad Connection!'], 404); 
+        }
+        $savings_account = $data["response"]["Results"]["0"];
+        if($savings_account === null){
+            return response(['status' => 'Error','message' => 'result not found!'], 404);
+        }
+
+        if($savings_account["savings_product_id"] == "717"){
+            $rate = "3";
+        }
+ 
+        if($savings_account["savings_product_id"] == "2135"){
+            $rate = "2.5";
+        }
+ 
+        if($savings_account["savings_product_id"] == "2157"){
+            $rate = "2";
+        }
+        // return $savings_account['borrower_id'];
+        $url = "https://api-main.loandisk.com/3546/4110/borrower/".$savings_account['borrower_id'];
+        $curl = curl_init();
+        curl_setopt_array($curl, array(
+        CURLOPT_URL => $url,
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_ENCODING => "",
+        CURLOPT_MAXREDIRS => 10,
+        CURLOPT_TIMEOUT => 30,
+        CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+        CURLOPT_CUSTOMREQUEST => "GET",
+            CURLOPT_HTTPHEADER => array(
+                "accept: application/json",
+                "cache-control: no-cache",
+                "content-type: application/json",
+                "Authorization: Basic AkMbezWYERkE5NcDsXAM7YzkxDySG9amAKvajU9d"
+            ),
+        ));
+        curl_setopt($curl, CURLOPT_SSL_VERIFYPEER, true);
+        $bordata = json_decode(curl_exec($curl), true); 
+        $httpcode = curl_getinfo($curl, CURLINFO_HTTP_CODE);
+        curl_close($curl);
+
+        $bbio = $bordata["response"]["Results"]["0"];
+
+        $fullname = $bbio['borrower_firstname']." ".$bbio['borrower_lastname'];
+    
+
 
         $url = "https://api-main.loandisk.com/3546/4110/saving_transaction/saving/".request()->savings_id."/from/1/count/50";
         $curl = curl_init();
@@ -59,24 +108,42 @@ class PDFController extends Controller
         curl_close($curl);
 
         $pre_data = $txndata['response']['Results']['0'];
-        // return $pre_data;
-        $firstdate = '';
-        $i = 0;
-        $amt = 0;
         
+        $firstdate = '';
+        $i = 1;
+        $ni = 0;
+        $amt = 0;
+    
+        $month = date('m',strtotime(request()->investment_start_date)); 
+            
         foreach($pre_data as $key){
             if($key['transaction_type_id'] == 1){
                 $amt += $key['transaction_amount'];
-                if($firstdate == ''){
+                if($i == 1){
                     $firstdate = $key['transaction_date'];
+                }
+                $i++;
+            }
+            if(request()->next_interest === 0){
+                if($key['transaction_type_id'] == 9){
+                    if($month === date('m',strtotime(str_replace('/','-',$key['transaction_date'])))){
+                        $ni += $key['transaction_amount'];
+                    }
+                }
+            }
+            if(request()->next_interest > 0){
+                if($key['transaction_type_id'] == 9){
+                    $nxtmonth = date('m-Y',strtotime('+1 month',strtotime(request()->investment_start_date)));
+                    if(date('m-Y',strtotime(str_replace('/','-',$key['transaction_date']))) === $nxtmonth){
+                        $ni += $key['transaction_amount'];
+                    }
                 }
             }
         }
-        // return $firstdate;
+        
         $fd = str_replace('/', '-', $firstdate);
         // return $pre_data[2]['transaction_type_id'];
         //rate and times 12
-        $rate = request()->rate;
         $rateX12 = $rate * 12;
 
         // present interest 
@@ -91,23 +158,26 @@ class PDFController extends Controller
         $year = date("Y",strtotime($investmentstartdate));
         $daysinamonthone = cal_days_in_month(CAL_GREGORIAN,$month,$year);
         
-        $precalc = ($actualtenor * $rate) / $daysinamonthone;
-        $firstinterest = round($precalc * $amount, 2);
+        // $precalc = ($actualtenor * $rate) / $daysinamonthone;
+        // $firstinterest = round($precalc * $amount, 2);
 
-        $successiveinterest =  ($amt/100) * $rate;
+        $successiveinterest = $amt * ($rate/100);
+
         //data
         $result = [
             'amount' => number_format(request()->amount),
             'rate' => $rate,
             'per_annum' => $rateX12,
-            'mat_date' => date('F j, Y',strtotime($savings_account['custom_field_1176'])),
+            'mat_date' => date('F j, Y',strtotime(str_replace('/','-',$savings_account['custom_field_1176']))),
             'duration' => request()->duration." months",
-            'firstinterest' => number_format($firstinterest),
             'totaldeposit' => number_format($amt),
             'investmentdate' => date('F j, Y',strtotime($investmentstartdate)),
             'investmentenddate' => date('F t, Y',strtotime($investmentstartdate)),
             'successiveinterest' => number_format($successiveinterest),
-            'firstdate' => date('F j, Y',strtotime($fd))
+            'firstdate' => date('F j, Y',strtotime($fd)),
+            'fullname' => $fullname,
+            'next_interest' => $ni,
+            'investment_start_date' => request()->investment_start_date
         ];
         // return $result;
 

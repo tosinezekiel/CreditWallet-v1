@@ -81,7 +81,7 @@
            <tr>
             <td colspan="2">
              <header>
-                 <span>Dear Mr. Dominic Okene, </span>
+                 <span>Dear Mr. {{ $fullname }}, </span>
              </header>   
              </td>
             </tr>
@@ -95,7 +95,7 @@
             <tr>
                 <td colspan="2">
                  <header>
-                     <span>We confirm receipt of your additional NGN {{ $amount }} investment on {{$investmentdate}} bringing your total deposit investment with Princeps Credit Systems Limited to NGN {{$totaldeposit}}. 
+                     <span>We confirm receipt of your additional ₦ {{ $amount }} investment on {{$investmentdate}} bringing your total deposit investment with Princeps Credit Systems Limited to ₦ {{$totaldeposit}}. 
                         <br><br>Please see updated terms below:  
                     </span>
                  </header>   
@@ -107,7 +107,7 @@
              <strong>DEPOSIT AMOUNT: </strong>
             </td>
             <td width="80%">
-             NGN {{$totaldeposit}} (Seven million naira) 
+             ₦ {{ $totaldeposit }} 
              </td>
         </tr>
         <tr>
@@ -123,7 +123,7 @@
                 <strong>INTEREST AMOUNT: </strong>
              </td>
              <td width="80%">
-                 NGN {{$successiveinterest}} per month (prorated)  
+                 ₦ {{$successiveinterest}} per month (prorated)  
               </td>
          </tr>
          <tr>
@@ -131,7 +131,7 @@
                 <strong>DURATION:  </strong>
              </td>
              <td width="80%">
-                 12 Months 
+                 {{$duration}}
              </td>
          </tr>
          <tr>
@@ -161,14 +161,9 @@
             
             
                 <p>
-                    Your next interest payment of NGN  {{$firstinterest}} will be made on or before {{$investmentenddate}}, kindly see details below : 
-                    <ul>
-                        <li>NGN 7,741.94 on NGN 1m for 8 days on May 22, 2020</li>
-                        <li>NGN 7,741.94 on NGN 1m for 8 days on May 22, 2020</li>
-                        <li>NGN 7,741.94 on NGN 1m for 8 days on May 22, 2020</li>
-                    </ul>
-                    
-                    Thereafter, you’ll receive monthly interest payments of NGN {{$successiveinterest}} at the end of each successive month.  
+                    Your next interest payment of ₦{{number_format($next_interest,2)}} will be made on or before {{$investmentenddate}}.
+               
+                    Thereafter, you’ll receive monthly interest payments of ₦ {{$successiveinterest}} at the end of each successive month.  
                </p>
             
           
