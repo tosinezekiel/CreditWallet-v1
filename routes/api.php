@@ -61,6 +61,7 @@ Route::group(['middleware' => 'investments', 'prefix' => 'v1'],function () {
     Route::post('investments/merge/initiate', 'InvestmentstartController@initiate');
 });
 
+//admin guard
 Route::group(['middleware' => 'admin', 'prefix' => 'v1'],function () {
     Route::get('investments/logout', 'InvestmentLoginController@logout');
     Route::post('investments/change-password', 'InvestmentController@changePassword');
