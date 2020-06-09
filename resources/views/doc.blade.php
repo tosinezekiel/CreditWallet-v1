@@ -63,7 +63,7 @@
             </div>
             <div class="right-to-left">
                 <span class="left">Credit Wallet</span>
-                <span class="right">Date: 27/05/2020 <br>{{request()->name}}</span>
+                <span class="right">Date: 27/05/2020 <br>{{$fn}}</span>
             </div>
             <div class="clear"></div>
             <div class="simple-header">SAVINGS ACCOUNT</div>

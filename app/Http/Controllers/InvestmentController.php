@@ -174,12 +174,17 @@ class InvestmentController extends Controller
         $data = json_decode(curl_exec($curl), true); 
         $httpcode = curl_getinfo($curl, CURLINFO_HTTP_CODE);
         curl_close($curl);
-        $results = [];
+        if(!empty($data['error'])){
+            return response(['status' => 'Error','message' => 'result not found!'], 404);
+        }
+        if(empty($data)){
+            return response(['status' => 'Error','message' => 'Bad Connection!'], 404); 
+        }
+        $savings_account = $data["response"]["Results"]["0"];
+        if($savings_account === null){
+            return response(['status' => 'Error','message' => 'result not found!'], 404);
+        }
 
-        
-        $savings_account = $data['response']['Results']['0'];
-
-        
         $results['total_savings'] = $savings_account;
         $i_amount = 0;
         $earn_amount = 0;
@@ -353,19 +358,17 @@ class InvestmentController extends Controller
         $data = json_decode(curl_exec($curl), true); 
         $httpcode = curl_getinfo($curl, CURLINFO_HTTP_CODE);
         curl_close($curl);
-        $results = [];
         if(!empty($data['error'])){
-            return response(['status' => 'Error','message' => 'Savings not found!'], 404);
-        }else{
-            $savings_account = $data["response"]["Results"]["0"];
-            if($savings_account === null){
-                return response(['status' => 'Error','message' => 'Savings not found!'], 404);
-            }
+            return response(['status' => 'Error','message' => 'result not found!'], 404);
         }
-    
-        $savings_account = $data['response']['Results']['0'];
-        // $results['savings'] = $savings_account;
-
+        if(empty($data)){
+            return response(['status' => 'Error','message' => 'Bad Connection!'], 404); 
+        }
+        $savings_account = $data["response"]["Results"]["0"];
+        if($savings_account === null){
+            return response(['status' => 'Error','message' => 'result not found!'], 404);
+        }
+   
         $savings_id = $savings_account['savings_id'];
 
         
@@ -711,17 +714,15 @@ public function calculateForStageFour(){
         curl_close($curl);
         $results = [];
         if(!empty($data['error'])){
-            return response(['status' => 'Error','message' => 'Savings not found!'], 404);
-        }else{
-            $savings_account = $data["response"]["Results"]["0"];
-            if($savings_account === null){
-                return response(['status' => 'Error','message' => 'Savings not found!'], 404);
-            }
+            return response(['status' => 'Error','message' => 'result not found!'], 404);
         }
-        $savings_account = $data['response']['Results']['0'];
-    
-        
-        
+        if(empty($data)){
+            return response(['status' => 'Error','message' => 'Bad Connection!'], 404); 
+        }
+        $savings_account = $data["response"]["Results"]["0"];
+        if($savings_account === null){
+            return response(['status' => 'Error','message' => 'result not found!'], 404);
+        }
 
         $url = "https://api-main.loandisk.com/3546/4110/saving_transaction/saving/".request()->savings_id."/from/1/count/50";
         $curl = curl_init();
@@ -753,13 +754,7 @@ public function calculateForStageFour(){
             }
         }
         
-        
         $interest = $rate * $amt;
-
-
-
-        // return request()->current_interest."-".$interest."-".$amt;
-        
 
         $last_date = strtotime(str_replace('/', '-', request()->investment_start_date));
         // $mat_date = strtotime(str_replace('/', '-', $savings_account['custom_field_1176']));
@@ -769,9 +764,6 @@ public function calculateForStageFour(){
         // $diff = abs($last_date - $mat_date); 
         // $years = floor($diff / (365*60*60*24));  
         // $months = floor(($diff - $years * 365*60*60*24) / (30*60*60*24)); 
-        
-
-        // return $months;
         $startdate = date('d-m-Y', strtotime(request()->investment_start_date));
         
         $date1=date_create($startdate);
@@ -783,21 +775,15 @@ public function calculateForStageFour(){
         if($months === 0){
             $months = $datediff->y * 12;
         }
-        // return $months;
-        
+
         for($x=1; $x <= $months; $x++){
             if($x==1){
                 $interest = request()->current_interest + ($rate * $amt);
             }
             $ttt = strtotime($investmentstartdate);
-            
             $dt = date('t-m-Y', strtotime('+'.$x.' month',$ttt));
-            
             $txndate = str_replace('-', '/', $dt);
-
-        //     return $txndate;
-        // break;
-            
+        
             $post = [
                 'savings_id' => request()->savings_id,
                 'transaction_date' => $txndate,
@@ -806,6 +792,7 @@ public function calculateForStageFour(){
                 'transaction_amount' => round($interest, 2),
                 'transaction_description' => 'Interest Due on '.$txndate
             ];
+
             $url = "https://api-main.loandisk.com/3546/4110/saving_transaction";
             $curl = curl_init();
             curl_setopt_array($curl, array(
@@ -828,9 +815,6 @@ public function calculateForStageFour(){
             $sdata = json_decode(curl_exec($curl), true); 
             $httpcode = curl_getinfo($curl, CURLINFO_HTTP_CODE);
             curl_close($curl);
-
-            // return $sdata;
-            // sleep(30);
         }
         
         return $data;
@@ -857,14 +841,23 @@ public function calculateForStageFour(){
         $data = json_decode(curl_exec($curl), true); 
         $httpcode = curl_getinfo($curl, CURLINFO_HTTP_CODE);
         curl_close($curl);
-        $results = [];
-        $savings_account = $data['response']['Results']['0'];
+        if(!empty($data['error'])){
+            return response(['status' => 'Error','message' => 'result not found!'], 404);
+        }
+        if(empty($data)){
+            return response(['status' => 'Error','message' => 'Bad Connection!'], 404); 
+        }
+        $savings_account = $data["response"]["Results"]["0"];
+        if($savings_account === null){
+            return response(['status' => 'Error','message' => 'result not found!'], 404);
+        }
         $results['savings'] = $savings_account;
         $savings_transactions = $this->getSingleSavingsTransactions($savings_id);
         
         usort($savings_transactions, function ($a, $b) {
             return strtotime(str_replace('/','-',$a['transaction_date'])) - strtotime(str_replace('/','-',$b['transaction_date']));
         });
+
         $fmttxn = array_map(function($a){
             return [
                 'date' => str_replace('-','/',$a['transaction_date'])." ".$a['transaction_time'],
@@ -875,9 +868,8 @@ public function calculateForStageFour(){
                 'balance' => $a['transaction_balance']
             ];
         }, $savings_transactions);
-        // return $results;
+        
         $results['saving_transactions'] = $fmttxn;
-
         return $results;
     }
     public function changePassword(){
@@ -1075,10 +1067,20 @@ public function calculateForStageFour(){
         $data = json_decode(curl_exec($curl), true); 
         $httpcode = curl_getinfo($curl, CURLINFO_HTTP_CODE);
         curl_close($curl);
+        if(!empty($data['error'])){
+            return response(['status' => 'Error','message' => 'result not found!'], 404);
+        }
+
+        if(empty($data)){
+            return response(['status' => 'Error','message' => 'Bad Connection!'], 404); 
+        }
+
         $pre_data = $data['response']['Results']['0'];
+        if($pre_data === null){
+            return response(['status' => 'Error','message' => 'result not found!'], 404);
+        }
         
         $m = date('m',strtotime(request()->investment_start_date));
-        // return $m;
         $results = [];
         foreach($pre_data as $txn){
             $fmtdate = str_replace('/','-',$txn['transaction_date']);

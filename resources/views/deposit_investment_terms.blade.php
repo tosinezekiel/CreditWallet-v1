@@ -95,7 +95,7 @@
             <tr>
                 <td colspan="2">
                  <header>
-                     <span>We confirm receipt of your additional ₦ {{ $amount }} investment on {{$investmentdate}} bringing your total deposit investment with Princeps Credit Systems Limited to ₦ {{$totaldeposit}}. 
+                     <span>We confirm receipt of your additional N{{ $amount }} investment on {{$investmentdate}} bringing your total deposit investment with Princeps Credit Systems Limited to N{{$totaldeposit}}. 
                         <br><br>Please see updated terms below:  
                     </span>
                  </header>   
@@ -107,7 +107,7 @@
              <strong>DEPOSIT AMOUNT: </strong>
             </td>
             <td width="80%">
-             ₦ {{ $totaldeposit }} 
+             N{{ $totaldeposit }} 
              </td>
         </tr>
         <tr>
@@ -123,7 +123,7 @@
                 <strong>INTEREST AMOUNT: </strong>
              </td>
              <td width="80%">
-                 ₦ {{$successiveinterest}} per month (prorated)  
+                 N{{$successiveinterest}} per month (prorated)  
               </td>
          </tr>
          <tr>
@@ -163,7 +163,7 @@
                 <p>
                     Your next interest payment of ₦{{number_format($next_interest,2)}} will be made on or before {{$investmentenddate}}.
                
-                    Thereafter, you’ll receive monthly interest payments of ₦ {{$successiveinterest}} at the end of each successive month.  
+                    Thereafter, you’ll receive monthly interest payments of N{{$successiveinterest}} at the end of each successive month.  
                </p>
             
           

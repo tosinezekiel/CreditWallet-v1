@@ -179,22 +179,24 @@ class PDFController extends Controller
             'next_interest' => $ni,
             'investment_start_date' => request()->investment_start_date
         ];
-        // return $result;
 
         $pdf = PDF::loadView('deposit_investment_terms', $result);
   
         $pdf->setPaper('A4','portrait');
-        // $terms = date("YmdHis") . $this->randomString(20, true) . '.pdf';
+        $terms = date("YmdHis") . $this->randomString(20, true) . '.pdf';
 
-        // Storage::put('public/pdf/'.$terms, $pdf->output());
+        Storage::put('public/pdf/'.$terms, $pdf->output());
 
         // $file2url = 'http://localhost:8000'.Storage::url('public/pdf/invoice2.pdf');
 
+        $termObj = [];
+        $termObj['pdf'] = $terms;
+        $termObj['full_name'] = $fullname;
+        return $termObj;
         // return 'storage/pdf/'.$terms;
-        return $pdf->download('deposit_investment_terms.pdf');
+        // return $pdf->download('deposit_investment_terms.pdf');
     }
     public function generatePDF2(){
-        
         // $fileurl = 'http://localhost:8000'.Storage::url('public/pdf/invoice.pdf');
         // return $fileurl;
         date_default_timezone_set('Africa/Lagos');
@@ -222,6 +224,22 @@ class PDFController extends Controller
         curl_close($curl);
         
         $savings_account = $data['response']['Results']['0'];
+
+        $savings_account = $data['response']['Results']['0'];
+
+        if($savings_account["savings_product_id"] == "717"){
+            $irate = "3";
+        }
+ 
+        if($savings_account["savings_product_id"] == "2135"){
+            $irate = "2.5";
+        }
+ 
+        if($savings_account["savings_product_id"] == "2157"){
+            $irate = "2";
+        }
+        $savings_account['rate_per_annum'] = number_format($irate * 12,1);
+        // return $savings_account;
 
         $url = "https://api-main.loandisk.com/3546/4110/saving_transaction/saving/".request()->savings_id."/from/1/count/50";
         $curl = curl_init();
@@ -264,33 +282,32 @@ class PDFController extends Controller
                 'transaction_balance' => $a['transaction_balance']
             ];
         }, $new_array);
-        // return $testarray;
+
         usort($testarray, function ($a, $b) {
             return strtotime($a['transaction_date']) - strtotime($b['transaction_date']);
         });
 
+        $terms = $this->generatePDF();
+        $fn = $terms['full_name'];
+        $dtpdf = 'storage/pdf/'.$terms['pdf'];
         // creating pdf;
-        $pdf = PDF::loadView('doc', compact('savings_account','testarray'));
-  
+        $pdf = PDF::loadView('doc', compact('savings_account','testarray','fn'));
         $pdf->setPaper('A4','portrait');
 
         $investmentschedule = date("YmdHis") . $this->randomString(20, true) . '.pdf';
-
         Storage::put('public/pdf/'.$investmentschedule, $pdf->output());
-
-        //  return $pdf->download('doc.pdf');
 
         $inv = 'storage/pdf/'.$investmentschedule;
         // return $inv;
-        $terms = $this->generatePDF();
-        $to = request()->email;
-        $toname = request()->name;
+        
+        $to = 'seunezekiel11@gmail.com';
+        $toname = "test name";
         $subject = "Test Download";
         $replyto = 'seunezekiel11@gmail.com';
 
         // $fileurl = 'http://localhost:8000'.Storage::url('public/pdf/invoice.pdf');
 
-        $html = $this->investmentstartemail(request()->name, request()->amount, request()->investment_start_date);
+        $html = $this->investmentstartemail($fn, request()->amount, request()->investment_start_date);
         
         $array_data = array(
                 'from'=> 'Credit Wallet Finance<finance@mail.creditwallet.ng>',
@@ -298,7 +315,7 @@ class PDFController extends Controller
                 'subject'=> $subject,
                 'html'=> $html,
                 'h:Reply-To'=> $replyto,
-                'attachment[1]' => curl_file_create($terms, 'application/pdf', 'Deposit Terms.pdf'),
+                'attachment[1]' => curl_file_create($dtpdf, 'application/pdf', 'Deposit Terms.pdf'),
                 'attachment[2]' => curl_file_create($inv, 'application/pdf', 'Investment Schedule.pdf')
         );
             $session = curl_init(env('MAILGUN_URL').'/messages');
@@ -425,11 +442,9 @@ class PDFController extends Controller
         $fileurl = env('APP_URL').Storage::url('public/pdf/'.$investmentschedule);
         
         return response(['url'=>$fileurl, 'status'=>'success'], 200);
-
-
-        //  return $pdf->download('doc.pdf');
     }
     public function generatePDF3(){
+
         $result = ['title'=>'i love this'];
         $pdf = PDF::loadView('generate_pdf', $result);
   

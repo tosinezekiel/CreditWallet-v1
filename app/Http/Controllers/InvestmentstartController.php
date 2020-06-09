@@ -73,7 +73,16 @@ class InvestmentstartController extends Controller
         $httpcode = curl_getinfo($curl, CURLINFO_HTTP_CODE);
         curl_close($curl);
         $results = [];
-        $savings_account = $data['response']['Results']['0'];
+        if(!empty($data['error'])){
+            return response(['status' => 'Error','message' => 'result not found!'], 404);
+        }
+        if(empty($data)){
+            return response(['status' => 'Error','message' => 'Bad Connection!'], 404); 
+        }
+        $savings_account = $data["response"]["Results"]["0"];
+        if($savings_account === null){
+            return response(['status' => 'Error','message' => 'result not found!'], 404);
+        }
 
         if($savings_account["savings_product_id"] == "717"){
             $irate = "3";

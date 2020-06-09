@@ -13,7 +13,20 @@ use Illuminate\Http\Request;
 class AdminloginController extends Controller
 {
     public function getToken(Request $request){
-        $customClaims = $this->createCustomClaims($request);
+        request()->validate([
+            "email" => "required",
+            "password" => "required",
+            "firstname" => "required",
+            "lastname" => "required",
+            "staff_id" => "required",
+            "authid" => "required",
+            "department" => "required",
+            "wavied" => "required",
+            "girotoken" => "required"
+        ]);
+        $data = $this->datarequest();
+        
+        $customClaims = $this->createCustomClaims($data);
 
         $factory = JWTFactory::customClaims([
             'sub'   => env('APP_KEY'),
@@ -42,11 +55,11 @@ class AdminloginController extends Controller
         return response(['data' => $apy], 200); 
     }
 
-    private function createCustomClaims($request){
+    private function createCustomClaims($data){
         date_default_timezone_set('Africa/Lagos');
         $now = Carbon::now();
 
-        $customClaims = $request->all();
+        $customClaims = $data;
         $customClaims['now'] = $now->format('Y-m-d H:i:s');
         $customClaims['expiry'] = $now->addHour(6)->format('Y-m-d H:i:s');
         return $customClaims;
@@ -55,5 +68,21 @@ class AdminloginController extends Controller
     private function getTokensPayload(){
         $token = JWTAuth::getToken(); 
         return JWTAuth::getPayload($token);
+    }
+
+    private function datarequest(){
+        return array(
+            "email" => request()->email,
+            "password" => request()->password,
+            "firstname" => request()->firstname,
+            "lastname" => request()->lastname,
+            "staff_id" => request()->staff_id,
+            "authid" => request()->authid,
+            "position" => request()->position,
+            "department" => request()->department,
+            "wavied" => request()->waveid,
+            "girotoken" => request()->girotoken,
+            "v1_token" => request()->v1_token
+        );
     }
 }

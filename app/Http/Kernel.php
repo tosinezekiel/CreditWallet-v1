@@ -66,5 +66,6 @@ class Kernel extends HttpKernel
         'jwt.verify' => \App\Http\Middleware\JwtMiddleware::class,
         'return-json' => \App\Http\Middleware\JsonMiddleware::class,
         'investments' => \App\Http\Middleware\InvestmentMiddleware::class,
+        'admin' => \App\Http\Middleware\AdminMiddleware::class,
     ];
 }

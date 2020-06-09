@@ -19,10 +19,10 @@ class Adminlogin extends Model
     }
 
     protected $fillable = [
-        'auth_id', 'email', 'firstname', 'lastname', 'waveid', 'position', 'department', 'staff_id', 'v1_token', 'password', 'girotoken',
+        'authid', 'email', 'firstname', 'lastname', 'wavied', 'position', 'department', 'staff_id', 'v1_token', 'password', 'girotoken',
     ];
     protected $hidden = [
-        'auth_id', 'email', 'waveid', 'position', 'department', 'staff_id', 'v1_token', 'password', 'girotoken',
+        'authid', 'email', 'wavied', 'position', 'department', 'staff_id', 'v1_token', 'password', 'girotoken',
     ]; 
 
     public function resourcerequest(){

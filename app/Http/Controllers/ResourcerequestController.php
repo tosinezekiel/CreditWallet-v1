@@ -21,19 +21,56 @@ class ResourcerequestController extends Controller
         $data = $this->filterResource($request);
         return response(['data' => $data,'status' => 'success'], 200); 
     }
-
-    public function store(Request $request){
+    public function awaiting(Request $request){
         if(! $token = JWTAuth::getToken()){
-            return response(['message' => 'unauthenticated', 'status'=>'error'], 401);
+            return response(['message' => 'unauthenticated', 'status' => 'error'], 401);
         }
         if(empty(JWTAuth::parseToken()->check())){
             return response(['message' => 'expired token', 'status' => 'error'], 401);
         }
+        $data = Resourcerequest::where('status',0)->get();
+        return response(['data' => $data,'status' => 'success'], 200); 
+    }
+    
+    public function approved(Request $request){
+        if(! $token = JWTAuth::getToken()){
+            return response(['message' => 'unauthenticated', 'status' => 'error'], 401);
+        }
+        if(empty(JWTAuth::parseToken()->check())){
+            return response(['message' => 'expired token', 'status' => 'error'], 401);
+        }
+        $data = Resourcerequest::where('status',1)->get();
+        return response(['data' => $data,'status' => 'success'], 200); 
+    }
+    
+    public function rejected(Request $request){
+        if(! $token = JWTAuth::getToken()){
+            return response(['message' => 'unauthenticated', 'status' => 'error'], 401);
+        }
+        if(empty(JWTAuth::parseToken()->check())){
+            return response(['message' => 'expired token', 'status' => 'error'], 401);
+        }
+        $data = Resourcerequest::where('status',2)->get();
+        return response(['data' => $data,'status' => 'success'], 200); 
+    }
+    
+    public function canceled(Request $request){
+        if(! $token = JWTAuth::getToken()){
+            return response(['message' => 'unauthenticated', 'status' => 'error'], 401);
+        }
+        if(empty(JWTAuth::parseToken()->check())){
+            return response(['message' => 'expired token', 'status' => 'error'], 401);
+        }
+        $data = Resourcerequest::where('status',3)->get();
+        return response(['data' => $data,'status' => 'success'], 200); 
+    }
+    public function store(Request $request){
         $apy = $this->getTokensPayload();
         $uuid = $apy['uuid'];
        
         $this->validateStore();
-        $creator = Adminlogin::where('authid', $uuid->auth_id)->first();
+
+        $creator = Adminlogin::where('authid', $uuid->authid)->first();
         $resourcerequest = $creator->resourcerequest()->create([
             'title' => $request->get('title'),
             'description' => $request->get('description'),
@@ -54,18 +91,16 @@ class ResourcerequestController extends Controller
     }
 
 
-    public function reject(Request $request, Resourcerequest $resourcerequest){
-        if(! $token = JWTAuth::getToken()){
-            return response(['message' => 'unauthenticated', 'status'=>'error'], 401);
-        }
-        if(empty(JWTAuth::parseToken()->check())){
-            return response(['message' => 'expired token', 'status' => 'error'], 401);
-        }
+    public function reject(Request $request){
+        request()->validate([
+            "reason" => "required"
+        ]);
         $apy = $this->getTokensPayload();
         $uuid = $apy['uuid'];
 
         $now = date("Y-m-d H:i:s");
         $this->validateMessage();
+        $resourcerequest = Resourcerequest::whereId(request()->id)->first();
         $resourcerequest->update(['status'=>2, 'final_approved_by' => $uuid->authid, 'final_approved_date' => $now ]);
         $to = $resourcerequest->creator->email;
         $toname = $resourcerequest->creator->firstname;
@@ -97,12 +132,6 @@ class ResourcerequestController extends Controller
     }
 
     public function cancel(Resourcerequest $resourcerequest){
-        if(! $token = JWTAuth::getToken()){
-            return response(['message' => 'unauthenticated', 'status'=>'error'], 401);
-        }
-        if(empty(JWTAuth::parseToken()->check())){
-            return response(['message' => 'expired token', 'status' => 'error'], 401);
-        }
         $apy = $this->getTokensPayload();
         $uuid = $apy['uuid'];
 
@@ -112,12 +141,6 @@ class ResourcerequestController extends Controller
     }
 
     public function approve(Request $request, Resourcerequest $resourcerequest){
-        if(! $token = JWTAuth::getToken()){
-            return response(['message' => 'unauthenticated', 'status'=>'error'], 401);
-        }
-        if(empty(JWTAuth::parseToken()->check())){
-            return response(['message' => 'expired token', 'status' => 'error'], 401);
-        }
         $apy = $this->getTokensPayload();
         $uuid = $apy['uuid'];
 
@@ -230,11 +253,11 @@ public function ResourceRequestEmail ($name, $message, $email, $department) {
             $query->where('description', '=', $request->description);
         }
         if($request->filled('from') && $request->filled('to')){
-            $this->validateList();
             $from = date($request->from);
+            $begin = date("Y-m-d",strtotime($from . ' -1 day'));
             $to = date($request->to);
-            $query->where('created_at','>=',$from)
-            ->where('created_at','<=',$to);  
+            $end = date("Y-m-d",strtotime($to . ' +1 day'));
+            $query->whereBetween('created_at',[$begin,$end]);
         }
         return $query->paginate($request->page_size);
     }
