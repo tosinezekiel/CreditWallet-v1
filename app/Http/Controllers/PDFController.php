@@ -4,10 +4,34 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use App\Investmentstart;
 use PDF;
 
 class PDFController extends Controller
 {
+    public function updatestage(){
+        request()->validate([
+            "id" => "required",
+            "stage" => 'required'
+        ]);
+        $update = Investmentstart::where('id',request()->id)->first();
+        
+        $update->update(['stage'=> request()->stage]);
+        
+
+        // return response(['message'=>'stage successfully updated','status' => 'success'],200);
+    }
+    
+    public function getnextinterest(){
+        request()->validate([
+            "id" => "required"
+        ]);
+        $update = Investmentstart::where('id',request()->id)->first();
+        
+        return $update->next_interest;
+        // $update->update(['next_interest'=> $value]);
+    }
+
     public function generatePDF()
     {
         // return request()->savings_id;
@@ -82,7 +106,10 @@ class PDFController extends Controller
         $bbio = $bordata["response"]["Results"]["0"];
 
         $fullname = $bbio['borrower_firstname']." ".$bbio['borrower_lastname'];
+
+        $bemail = $bbio['borrower_email'];
     
+        // return $bemail;
 
 
         $url = "https://api-main.loandisk.com/3546/4110/saving_transaction/saving/".request()->savings_id."/from/1/count/50";
@@ -115,7 +142,10 @@ class PDFController extends Controller
         $amt = 0;
     
         $month = date('m',strtotime(request()->investment_start_date)); 
-            
+        
+        $ldate = date('t-m-Y',strtotime(request()->investment_start_date)); 
+        
+        $nextinterest = $this->getnextinterest();
         foreach($pre_data as $key){
             if($key['transaction_type_id'] == 1){
                 $amt += $key['transaction_amount'];
@@ -124,18 +154,19 @@ class PDFController extends Controller
                 }
                 $i++;
             }
-            if(request()->next_interest === 0){
+            if($nextinterest === 0){
                 if($key['transaction_type_id'] == 9){
-                    if($month === date('m',strtotime(str_replace('/','-',$key['transaction_date'])))){
-                        $ni += $key['transaction_amount'];
+                    $fmt = str_replace('/','-',$key['transaction_date']);
+                    if (strtotime($fmt) == strtotime($ldate)){
+                        $ni = $ni + $key['transaction_amount'];
                     }
                 }
             }
-            if(request()->next_interest > 0){
+            if($nextinterest > 0){
                 if($key['transaction_type_id'] == 9){
-                    $nxtmonth = date('m-Y',strtotime('+1 month',strtotime(request()->investment_start_date)));
-                    if(date('m-Y',strtotime(str_replace('/','-',$key['transaction_date']))) === $nxtmonth){
-                        $ni += $key['transaction_amount'];
+                    $fmt = str_replace('/','-',$key['transaction_date']);
+                    if (strtotime($fmt) == strtotime($ldate)){
+                        $ni = $ni + $key['transaction_amount'];
                     }
                 }
             }
@@ -191,6 +222,7 @@ class PDFController extends Controller
 
         $termObj = [];
         $termObj['pdf'] = $terms;
+        $termObj['bemail'] = $bemail; 
         $termObj['full_name'] = $fullname;
         return $termObj;
         // return 'storage/pdf/'.$terms;
@@ -288,6 +320,7 @@ class PDFController extends Controller
         });
 
         $terms = $this->generatePDF();
+        // return $terms;
         $fn = $terms['full_name'];
         $dtpdf = 'storage/pdf/'.$terms['pdf'];
         // creating pdf;
@@ -300,10 +333,10 @@ class PDFController extends Controller
         $inv = 'storage/pdf/'.$investmentschedule;
         // return $inv;
         
-        $to = 'seunezekiel11@gmail.com';
-        $toname = "test name";
-        $subject = "Test Download";
-        $replyto = 'seunezekiel11@gmail.com';
+        $to = $terms['bemail'];
+        $toname = $fn;
+        $subject = "Deposit Investment";
+        $replyto = 'support@creditwallet.ng';
 
         // $fileurl = 'http://localhost:8000'.Storage::url('public/pdf/invoice.pdf');
 
@@ -332,9 +365,9 @@ class PDFController extends Controller
             curl_close($session);
             $results = json_decode($response, true);
             $results['status'] = "success";
+            $this->updatestage();
+            
             return $results;
-
-           
 
     }
     public function generatePDFtest($savings_id){
@@ -380,7 +413,32 @@ class PDFController extends Controller
         }
         $savings_account['rate_per_annum'] = number_format($irate * 12,1);
 
-        // return $savings_account;
+        $url = "https://api-main.loandisk.com/3546/4110/borrower/".$savings_account['borrower_id'];
+        $curl = curl_init();
+        curl_setopt_array($curl, array(
+        CURLOPT_URL => $url,
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_ENCODING => "",
+        CURLOPT_MAXREDIRS => 10,
+        CURLOPT_TIMEOUT => 30,
+        CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+        CURLOPT_CUSTOMREQUEST => "GET",
+            CURLOPT_HTTPHEADER => array(
+                "accept: application/json",
+                "cache-control: no-cache",
+                "content-type: application/json",
+                "Authorization: Basic AkMbezWYERkE5NcDsXAM7YzkxDySG9amAKvajU9d"
+            ),
+        ));
+        curl_setopt($curl, CURLOPT_SSL_VERIFYPEER, true);
+        $bordata = json_decode(curl_exec($curl), true); 
+        $httpcode = curl_getinfo($curl, CURLINFO_HTTP_CODE);
+        curl_close($curl);
+
+        $bbio = $bordata["response"]["Results"]["0"];
+
+        $fullname = $bbio['borrower_firstname']." ".$bbio['borrower_lastname'];
+
 
         $url = "https://api-main.loandisk.com/3546/4110/saving_transaction/saving/".$savings_id."/from/1/count/50";
         $curl = curl_init();
@@ -431,7 +489,7 @@ class PDFController extends Controller
         });
 
         // creating pdf;
-        $pdf = PDF::loadView('doc', compact('savings_account','testarray'));
+        $pdf = PDF::loadView('doc', compact('savings_account','testarray','full_name'));
   
         $pdf->setPaper('A4','portrait');
 

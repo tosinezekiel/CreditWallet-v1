@@ -7,6 +7,7 @@ use Tymon\JWTAuth\Exceptions\JWTException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use App\Investment;
+use App\Investmentstart;
 use Carbon\Carbon;
 class InvestmentController extends Controller
 {
@@ -17,94 +18,236 @@ class InvestmentController extends Controller
      */
     public function index()
     {
-        //
+        $investmentstart = Investmentstart::all();
+        $results = [];
+        
+        foreach($investmentstart as $inv){
+            $url = "https://api-main.loandisk.com/3546/4110/saving/".$inv->savings_id;
+        $curl = curl_init();
+        curl_setopt_array($curl, array(
+        CURLOPT_URL => $url,
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_ENCODING => "",
+        CURLOPT_MAXREDIRS => 10,
+        CURLOPT_TIMEOUT => 30,
+        CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+        CURLOPT_CUSTOMREQUEST => "GET",
+            CURLOPT_HTTPHEADER => array(
+                "accept: application/json",
+                "cache-control: no-cache",
+                "content-type: application/json",
+                "Authorization: Basic AkMbezWYERkE5NcDsXAM7YzkxDySG9amAKvajU9d"
+            ),
+        ));
+        curl_setopt($curl, CURLOPT_SSL_VERIFYPEER, true);
+        $data = json_decode(curl_exec($curl), true); 
+        $httpcode = curl_getinfo($curl, CURLINFO_HTTP_CODE);
+        curl_close($curl);
+        
+        if(!empty($data['error'])){
+            return response(['status' => 'Error','message' => 'result not found!'], 404);
+        }
+        if(empty($data)){
+            return response(['status' => 'Error','message' => 'Bad Connection!'], 404); 
+        }
+        $savings_account = $data["response"]["Results"]["0"];
+        if($savings_account === null){
+            return response(['status' => 'Error','message' => 'result not found!'], 404);
+        }
+        // return $savings_account['borrower_id'];
+        $url = "https://api-main.loandisk.com/3546/4110/borrower/".$savings_account['borrower_id'];
+        $curl = curl_init();
+        curl_setopt_array($curl, array(
+        CURLOPT_URL => $url,
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_ENCODING => "",
+        CURLOPT_MAXREDIRS => 10,
+        CURLOPT_TIMEOUT => 30,
+        CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+        CURLOPT_CUSTOMREQUEST => "GET",
+            CURLOPT_HTTPHEADER => array(
+                "accept: application/json",
+                "cache-control: no-cache",
+                "content-type: application/json",
+                "Authorization: Basic AkMbezWYERkE5NcDsXAM7YzkxDySG9amAKvajU9d"
+            ),
+        ));
+        curl_setopt($curl, CURLOPT_SSL_VERIFYPEER, true);
+        $bordata = json_decode(curl_exec($curl), true); 
+        $httpcode = curl_getinfo($curl, CURLINFO_HTTP_CODE);
+        curl_close($curl);
+        $bbio = $bordata["response"]["Results"]["0"];
+            $inv['borrower'] = [];
+            $inv['borrower'] = $bbio;
+            array_push($results,$inv);
+        }
+        return response(['data'=>$results,'status'=>'success'], 200);
+    }
+    
+    
+    public function updatestage(){
+        request()->validate([
+            "id" => "required",
+            "stage" => 'required'
+        ]);
+        $update = Investmentstart::where('id',request()->id)->first();
+        
+        $update->update(['stage'=> request()->stage]);
+        
+
+        // return response(['message'=>'stage successfully updated','status' => 'success'],200);
     }
 
+    public function updatenextinterest($value){
+        request()->validate([
+            "id" => "required"
+        ]);
+        $update = Investmentstart::where('id',request()->id)->first();
+        
+        $update->update(['next_interest'=> $value]);
+    }
+
+    public function getnextinterest(){
+        request()->validate([
+            "id" => "required"
+        ]);
+        $update = Investmentstart::where('id',request()->id)->first();
+        
+        return $update->next_interest;
+        // $update->update(['next_interest'=> $value]);
+    }
     /**
      * Show the form for creating a new resource.
      *
      * @return \Illuminate\Http\Response
      */
-    public function create()
-    {
-    //retrieving from loan disk using email;
-    $url = "https://api-main.loandisk.com/3546/4110/borrower/borrower_email/".request('email');
-    $curl = curl_init();
-    curl_setopt_array($curl, array(
-    CURLOPT_URL => $url,
-    CURLOPT_RETURNTRANSFER => true,
-    CURLOPT_ENCODING => "",
-    CURLOPT_MAXREDIRS => 10,
-    CURLOPT_TIMEOUT => 30,
-    CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
-    CURLOPT_CUSTOMREQUEST => "GET",
-        CURLOPT_HTTPHEADER => array(
-            "accept: application/json",
-            "cache-control: no-cache",
-            "content-type: application/json",
-            "Authorization: Basic AkMbezWYERkE5NcDsXAM7YzkxDySG9amAKvajU9d"
-        ),
-    ));
-    curl_setopt($curl, CURLOPT_SSL_VERIFYPEER, true);
-    $data = json_decode(curl_exec($curl), true); 
-    $httpcode = curl_getinfo($curl, CURLINFO_HTTP_CODE);
-    curl_close($curl);
-    $borrower_id = $savings_no = $uniquenumber = "";
-    // return json_decode(['data']);
+    public function setinvitecode(){    
+        //retrieving from loan disk using email;
+        $url = "https://api-main.loandisk.com/3546/4110/borrower/borrower_email/".request('email');
+        $curl = curl_init();
+        curl_setopt_array($curl, array(
+        CURLOPT_URL => $url,
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_ENCODING => "",
+        CURLOPT_MAXREDIRS => 10,
+        CURLOPT_TIMEOUT => 30,
+        CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+        CURLOPT_CUSTOMREQUEST => "GET",
+            CURLOPT_HTTPHEADER => array(
+                "accept: application/json",
+                "cache-control: no-cache",
+                "content-type: application/json",
+                "Authorization: Basic AkMbezWYERkE5NcDsXAM7YzkxDySG9amAKvajU9d"
+            ),
+        ));
+        curl_setopt($curl, CURLOPT_SSL_VERIFYPEER, true);
+        $data = json_decode(curl_exec($curl), true); 
+        $httpcode = curl_getinfo($curl, CURLINFO_HTTP_CODE);
+        curl_close($curl);
+        $borrower_id = $savings_no = $uniquenumber = "";
         if(isset($data['error'])){
-            return response(['Message'=>'the specified email can not be found','Status' => 'error'], 404);
+            return response(['message'=> $data['error']['message'],'status'=>'error']);
         }
+
         if($data['http']["code"] == 200){
             $resultObj =  $data['response']['Results']; 
             $result = $resultObj[0]; 
-            // return $result;
-            $rand = $this->getRandomString();
-            $hashed_password = Hash::make($rand);
+            if(empty($result)){
+                return response(['message'=> 'empty response','status'=>'error']);
+            }
+            $rand = $this->randomNumber(12);
 
             $array = [
                 'username' => $result['borrower_unique_number'],
-                'password' => $hashed_password,
                 'email' => $result['borrower_email'],
                 'borrower_id' => $result['borrower_id'],
-                'first_login' => 0
+                'code' => $rand
             ];
+            // return $array;
+            
+            if(Investment::whereEmail($result['borrower_email'])->exists()){
+                return response(['first_login' => 1, 'status' => 'success'], 200);
+                // return $results; 
+            }
             //storing data
             $investment = Investment::create($array);
-            // return response(['data'=>$investment,'original'=>$rand], 200);
-            // mailing user
-            $array_data = array(
-                'from'=> 'Credit Wallet Finance<finance@mail.creditwallet.ng>',
-                'to'=> $investment->email,
-                'subject'=> "Account created successfully",
-                'html'=> "<ul><li>Username: ".request()->email."</li><li>Password: ".$rand."</li></ul>",
-                'h:Reply-To'=> $investment->email
-                );
-                $session = curl_init(env('MAILGUN_URL').'/messages');
-                curl_setopt($session, CURLOPT_HTTPAUTH, CURLAUTH_BASIC);
-                curl_setopt($session, CURLOPT_USERPWD, 'api:'.env('MAILGUN_KEY'));
-                curl_setopt($session, CURLOPT_POST, true);
-                curl_setopt($session, CURLOPT_POSTFIELDS, $array_data);
-                curl_setopt($session, CURLOPT_HEADER, false);
-                curl_setopt($session, CURLOPT_ENCODING, 'UTF-8');
-                curl_setopt($session, CURLOPT_RETURNTRANSFER, true);
-                curl_setopt($session, CURLOPT_SSL_VERIFYPEER, false);
-                $response = curl_exec($session);
-                curl_close($session);
-                $results = json_decode($response, true);
-                $results['Status'] = "success";
-                $results['Message'] = "Account Created Successfully";
-                return $results; 
+            return response(['code' => $rand, 'email'=> $result['borrower_email'], 'status' => 'success'], 200);
+            // return $results; 
         }else{
             $response['status'] = "error";
             $response['data'] = $data;
             $response['message'] = "Something went wrong, please try again but if problem persist, please contact our customer support team on support@creditwallet.ng";
             echo json_encode($response);
         }
-    // return $data; 
+    }
+    private function randomNumber($length) {
+        $result = '';
+    
+        for($i = 0; $i < $length; $i++) {
+            $result .= mt_rand(0, 9);
+        }
+    
+        return $result;
+    }
+    public function create()
+    {
+        //retrieving from loan disk using email;     
+        if(Investment::whereEmail(request()->email)->exists()){
+            return response(['first_login' => 1, 'status' => 'success'], 200);
+        }
+        if(!Investment::whereEmail(request()->email)->whereCode(request()->code)->exists()){
+            return response(['message' => 'customer not valid', 'status' => 'error'], 422);
+        }
+        //retrieving data
+        $investment = Investment::whereEmail(request()->email)->first();
+        $customClaims = $this->createCustomClaim($investment);
+        $factory = JWTFactory::customClaims([
+            'sub'   => env('APP_KEY'),
+            'uuid' =>  $customClaims
+        ]);
+        $payload = $factory->make();
+        $token = JWTAuth::encode($payload);
+
+        return response(['first_login' => 0, 'status' => 'success', 'token' => "{$token}"], 200);
+    }
+
+
+    public function setPassword(){
+        if(! $token = JWTAuth::getToken()){
+            return response(['message' => 'unauthorized access', 'status'=>'error'], 401);
+        }
+        // check if expired
+        if(empty(JWTAuth::parseToken()->check())){
+            return response(['message' => 'expired token', 'status' => 'error'], 401);
+        }
+        // get tokens payload
+        $apy = $this->getTokensPayload();
+        $uuid = $apy['uuid'];
+        request()->validate([
+            'password' => "required|confirmed"
+        ]);
+        // return $apy;
+        if(!Investment::whereEmail($uuid->email)->exists()){
+            return response(['message'=>'invalid credentials', 'status'=>'error'], 422);
+        }
+
+        $password = Hash::make(request()->password);
+
+        $investor = Investment::whereEmail($uuid->email)->first();
+
+        
+        $investor->update(['password'=>$password]);
+        
+        return response(['message' => 'password set successfully','status'=>'success'], 200);
+        
     }
 
     
-
+    public function filterByParams(Request $request){
+        // return "hi";
+        $data = $this->filterResource($request);
+        return response(['data' => $data,'status' => 'success'], 200); 
+    }
     /**
      * Store a newly created resource in storage.
      *
@@ -131,12 +274,14 @@ class InvestmentController extends Controller
         $token = JWTAuth::getToken(); 
         return JWTAuth::getPayload($token);
     }
+    
+   
     public function savingsDashboard()
     {
-
+        
         $notification = array(
             'message' => "Due to the high volume of deposit investments that we have received recently, please note that we are currently not accepting deposit investments at this point. However, the investment platform will be available from 30th June, 2020. Thank you for choosing Princeps Credit Systems Limited",
-            'status' => 1
+            'status' => 0
         );
         //check for token
         if(! $token = JWTAuth::getToken()){
@@ -174,17 +319,12 @@ class InvestmentController extends Controller
         $data = json_decode(curl_exec($curl), true); 
         $httpcode = curl_getinfo($curl, CURLINFO_HTTP_CODE);
         curl_close($curl);
-        if(!empty($data['error'])){
-            return response(['status' => 'Error','message' => 'result not found!'], 404);
-        }
-        if(empty($data)){
-            return response(['status' => 'Error','message' => 'Bad Connection!'], 404); 
-        }
-        $savings_account = $data["response"]["Results"]["0"];
-        if($savings_account === null){
-            return response(['status' => 'Error','message' => 'result not found!'], 404);
-        }
+        $results = [];
 
+        
+        $savings_account = $data['response']['Results']['0'];
+
+        
         $results['total_savings'] = $savings_account;
         $i_amount = 0;
         $earn_amount = 0;
@@ -334,8 +474,10 @@ class InvestmentController extends Controller
 
         return $results;
     }
+    
 
-    public function deleteSavingsTransactionsOfOtherMonths(){
+    public function deleteSavingsTransactionsOfOtherMonths(Request $request){
+        
         date_default_timezone_set('Africa/Lagos');
         $url = "https://api-main.loandisk.com/3546/4110/saving/".request()->savings_id;
         $curl = curl_init();
@@ -358,6 +500,7 @@ class InvestmentController extends Controller
         $data = json_decode(curl_exec($curl), true); 
         $httpcode = curl_getinfo($curl, CURLINFO_HTTP_CODE);
         curl_close($curl);
+        // return $data;
         if(!empty($data['error'])){
             return response(['status' => 'Error','message' => 'result not found!'], 404);
         }
@@ -365,15 +508,12 @@ class InvestmentController extends Controller
             return response(['status' => 'Error','message' => 'Bad Connection!'], 404); 
         }
         $savings_account = $data["response"]["Results"]["0"];
-        if($savings_account === null){
+        if(empty($savings_account)){
             return response(['status' => 'Error','message' => 'result not found!'], 404);
         }
-   
-        $savings_id = $savings_account['savings_id'];
-
         
+        $savings_id = $savings_account['savings_id'];
         $url = "https://api-main.loandisk.com/3546/4110/saving_transaction/saving/".$savings_id."/from/1/count/50";
-
         $curl = curl_init();
         curl_setopt_array($curl, array(
         CURLOPT_URL => $url,
@@ -395,46 +535,54 @@ class InvestmentController extends Controller
         $httpcode = curl_getinfo($curl, CURLINFO_HTTP_CODE);
         curl_close($curl);
         $pre_data = $data['response']['Results']['0'];
-        // return $pre_data;
         $results['saving_transactions'] = $pre_data;     
         
         $investmentdate = str_replace('/','-',request()->investment_start_date);
         
         $startdeletingdate = date('d-m-Y',strtotime('+1 month',strtotime($investmentdate)));
 
-
+        
 
         foreach($results['saving_transactions'] as $key){
+            // return "wow";
             $new_tdate = str_replace('/', '-', $key['transaction_date']);
 
-                if($key['transaction_type_id'] === 9 && strtotime($new_tdate) > strtotime($startdeletingdate)){
-                    $url = "https://api-main.loandisk.com/3546/4110/saving_transaction/".$key['transaction_id'];
-                    $curl = curl_init();
-                    curl_setopt_array($curl, array(
-                    CURLOPT_URL => $url,
-                    CURLOPT_RETURNTRANSFER => true,
-                    CURLOPT_ENCODING => "",
-                    CURLOPT_MAXREDIRS => 10,
-                    CURLOPT_TIMEOUT => 30,
-                    CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
-                    CURLOPT_CUSTOMREQUEST => "DELETE",
-                        CURLOPT_HTTPHEADER => array(
-                            "accept: application/json",
-                            "cache-control: no-cache",
-                            "content-type: application/json",
-                            "Authorization: Basic AkMbezWYERkE5NcDsXAM7YzkxDySG9amAKvajU9d"
-                        ),
-                    ));
-                    curl_setopt($curl, CURLOPT_SSL_VERIFYPEER, true);
-                    $data = json_decode(curl_exec($curl), true); 
-                    $httpcode = curl_getinfo($curl, CURLINFO_HTTP_CODE);
-                    curl_close($curl);
+                // return $startdeletingdate. " --- " .$new_tdate;
+                
+                if($key['transaction_type_id'] === 9){
+                    if(strtotime($new_tdate) > strtotime($startdeletingdate)){
+                        $url = "https://api-main.loandisk.com/3546/4110/saving_transaction/".$key['transaction_id'];
+                        $curl = curl_init();
+                        curl_setopt_array($curl, array(
+                        CURLOPT_URL => $url,
+                        CURLOPT_RETURNTRANSFER => true,
+                        CURLOPT_ENCODING => "",
+                        CURLOPT_MAXREDIRS => 10,
+                        CURLOPT_TIMEOUT => 30,
+                        CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+                        CURLOPT_CUSTOMREQUEST => "DELETE",
+                            CURLOPT_HTTPHEADER => array(
+                                "accept: application/json",
+                                "cache-control: no-cache",
+                                "content-type: application/json",
+                                "Authorization: Basic AkMbezWYERkE5NcDsXAM7YzkxDySG9amAKvajU9d"
+                            ),
+                        ));
+                        curl_setopt($curl, CURLOPT_SSL_VERIFYPEER, true);
+                        $data = json_decode(curl_exec($curl), true); 
+                        $httpcode = curl_getinfo($curl, CURLINFO_HTTP_CODE);
+                        curl_close($curl);
+                    }
+                    
                 }
             
         }
-       return response(['message'=>'successfully Deleted', 'Status'=>'succcess'], 200);
+        $this->updatestage();
+       return response(['message'=>'successfully Deleted', 'status'=>'succcess'], 200);
     }
     public function addtransaction(){
+        // $this->updatestage();
+        // return "true";
         request()->validate([
             'amount' => 'required|numeric',
             'investment_start_date' => 'date',
@@ -446,17 +594,17 @@ class InvestmentController extends Controller
         $new_amount = number_format(request()->amount,2);
         $post = [
             'savings_id' => request()->savings_id,
-            'transaction_date' => str_replace('-','/',request()->investment_start_date),
+            'transaction_date' => date('d/m/Y', strtotime( str_replace('/', '-',request()->investment_start_date))),
             'transaction_time'   => $time,
             'transaction_type_id' => 1,
             'transaction_amount' => request()->amount,
             'transaction_description' => 'Additional Deposit of '.$new_amount
         ];
-        $url = "https://api-main.loandisk.com/3546/4110/saving_transaction";
-
+        
         // return $post;
+        $url = "https://api-main.loandisk.com/3546/4110/saving_transaction";
         $curl = curl_init();
-      
+        
         curl_setopt_array($curl, array(
         CURLOPT_URL => $url,
         CURLOPT_RETURNTRANSFER => true,
@@ -478,28 +626,60 @@ class InvestmentController extends Controller
         $data = json_decode(curl_exec($curl), true); 
         $httpcode = curl_getinfo($curl, CURLINFO_HTTP_CODE);
         curl_close($curl);
-        $results = [];
-        if(!empty($data['error'])){
-            return response(['status' => 'Error','message' => 'result not found!'], 404);
-        }else{
-            $result = $data["response"]["Results"]["0"];
-            if($result === null){
-                return response(['status' => 'Error','message' => 'result not found!'], 404);
-            }
-        }
-        return $data;
+        // return $data;
+        $this->updatestage();
+        return response(['message'=>'added transaction successfully', 'status'=>'succcess'], 200);
     }
 
     public function calculateThisMonthInterest(){
+        // $sn = Investmentstart::where('id',request()->id)->first();
+        // if($sn->stage !== request()->stage){
+        //   return response(['message'=>'kindly click on the right stage', 'status'=>'error'], 400);
+        // }
+        
         request()->validate([
             'amount' => 'required|numeric',
             'duration' => 'required|integer|min:6',
             'investment_start_date' => 'date',
-            'rate' => 'required|numeric',
             'savings_id' => 'required|numeric'
         ]);
         $history=array();
-        $rate = request()->rate/100;
+        $url = "https://api-main.loandisk.com/3546/4110/saving/".request()->savings_id;
+        $curl = curl_init();
+        curl_setopt_array($curl, array(
+        CURLOPT_URL => $url,
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_ENCODING => "",
+        CURLOPT_MAXREDIRS => 10,
+        CURLOPT_TIMEOUT => 30,
+        CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+        CURLOPT_CUSTOMREQUEST => "GET",
+            CURLOPT_HTTPHEADER => array(
+                "accept: application/json",
+                "cache-control: no-cache",
+                "content-type: application/json",
+                "Authorization: Basic AkMbezWYERkE5NcDsXAM7YzkxDySG9amAKvajU9d"
+            ),
+        ));
+        curl_setopt($curl, CURLOPT_SSL_VERIFYPEER, true);
+        $data = json_decode(curl_exec($curl), true); 
+        $httpcode = curl_getinfo($curl, CURLINFO_HTTP_CODE);
+        curl_close($curl);
+        $results = [];
+        $savings_account = $data['response']['Results']['0'];
+
+        if($savings_account["savings_product_id"] == "717"){
+            $irate = "3";
+        }
+ 
+        if($savings_account["savings_product_id"] == "2135"){
+            $irate = "2.5";
+        }
+ 
+        if($savings_account["savings_product_id"] == "2157"){
+            $irate = "2";
+        }
+        $rate = $irate/100;
         $amount = request()->amount;
         $investmentstartdate = date("Y-m-d",strtotime(request()->investment_start_date));
     
@@ -508,7 +688,7 @@ class InvestmentController extends Controller
         $date2=date_create($startdateenddate);
         $datediff = date_diff($date1,$date2);
         $actualtenor = $datediff->days;
-        
+
         $month = date("m",strtotime($investmentstartdate));
         $year = date("Y",strtotime($investmentstartdate));
         $daysinamonthone = cal_days_in_month(CAL_GREGORIAN,$month,$year);
@@ -517,7 +697,9 @@ class InvestmentController extends Controller
         if($isday > 24){
             $precalc = ($actualtenor * $rate) / $daysinamonthone;
             $interest = round($precalc * $amount, 2);
-            return response(['next_interest'=> $interest]);
+            $this->updatestage();
+            $this->updatenextinterest($interest);
+            return response(['next_interest'=> $interest, 'status'=>'success'], 200);
         }
         // return $daysinamonthone;
         $precalc = ($actualtenor * $rate) / $daysinamonthone;
@@ -564,15 +746,18 @@ class InvestmentController extends Controller
         $httpcode = curl_getinfo($curl, CURLINFO_HTTP_CODE);
         curl_close($curl);
         // return $sdata;
-        return response(['next_interest'=> 0]); 
+        $this->updatestage();
+        return response(['next_interest'=> 0,'status'=>'success'], 200); 
     }
 public function calculateForStageFour(){
     date_default_timezone_set('Africa/Lagos');
+    if(request()->stage !== 4){
+            return response(['message'=>'kindly click on the right stage', 'status'=>'error'], 400);
+        }
     request()->validate([
         'amount' => 'required|numeric',
         'duration' => 'required|integer|min:6',
         'investment_start_date' => 'date',
-        'rate' => 'required|numeric',
         'savings_id' => 'required|numeric'
     ]);
     $url = "https://api-main.loandisk.com/3546/4110/saving/".request()->savings_id;
@@ -596,15 +781,16 @@ public function calculateForStageFour(){
     $data = json_decode(curl_exec($curl), true); 
     $httpcode = curl_getinfo($curl, CURLINFO_HTTP_CODE);
     curl_close($curl);
+    
     $results = [];
-        if(!empty($data['error'])){
+    if(!empty($data['error'])){
             return response(['status' => 'Error','message' => 'Savings not found!'], 404);
-        }else{
-            $savings_account = $data["response"]["Results"]["0"];
-            if($savings_account === null){
-                return response(['status' => 'Error','message' => 'Savings not found!'], 404);
-            }
+    }else{
+        $savings_account = $data["response"]["Results"]["0"];
+        if($savings_account === null){
+            return response(['status' => 'Error','message' => 'Savings not found!'], 404);
         }
+    }
     $savings_account = $data['response']['Results']['0'];
     
     
@@ -670,26 +856,26 @@ public function calculateForStageFour(){
         $httpcode = curl_getinfo($curl, CURLINFO_HTTP_CODE);
         curl_close($curl);
         }
-        
-        return ['Status' => 'Success'];
+        $this->updatestage();
+        return response(['status' => 'success'], 200);
     }
     public function calculateForStageFive(){
         date_default_timezone_set('Africa/Lagos');
+        
         request()->validate([
             'amount' => 'required|integer',
             'duration' => 'required|integer|min:6',
             'investment_start_date' => 'date',
-            'rate' => 'required|numeric',
-            'savings_id' => 'required|numeric',
-            'current_interest' => 'required|numeric'
+            'savings_id' => 'required|numeric'
         ]);
         $investmentstartdate = request()->investment_start_date;
+        $nextinterest = $this->getnextinterest();
         // return $td;
         // $ttt = strtotime(str_replace('/', '-', $td));
         // $tf = str_replace('-', '/', $td);
         // $dt = date('Y-m-t', strtotime('+1 month',$ttt));
         // return $tf;
-        $rate = request()->rate/100;
+        
         date_default_timezone_set('Africa/Lagos');
         $url = "https://api-main.loandisk.com/3546/4110/saving/".request()->savings_id;
         $curl = curl_init();
@@ -723,6 +909,21 @@ public function calculateForStageFour(){
         if($savings_account === null){
             return response(['status' => 'Error','message' => 'result not found!'], 404);
         }
+        if($savings_account["savings_product_id"] == "717"){
+            $irate = "3";
+        }
+ 
+        if($savings_account["savings_product_id"] == "2135"){
+            $irate = "2.5";
+        }
+ 
+        if($savings_account["savings_product_id"] == "2157"){
+            $irate = "2";
+        }
+        $rate = $irate/100;
+    
+        
+        
 
         $url = "https://api-main.loandisk.com/3546/4110/saving_transaction/saving/".request()->savings_id."/from/1/count/50";
         $curl = curl_init();
@@ -754,7 +955,13 @@ public function calculateForStageFour(){
             }
         }
         
+        
         $interest = $rate * $amt;
+
+
+
+        // return request()->current_interest."-".$interest."-".$amt;
+        
 
         $last_date = strtotime(str_replace('/', '-', request()->investment_start_date));
         // $mat_date = strtotime(str_replace('/', '-', $savings_account['custom_field_1176']));
@@ -778,12 +985,17 @@ public function calculateForStageFour(){
 
         for($x=1; $x <= $months; $x++){
             if($x==1){
-                $interest = request()->current_interest + ($rate * $amt);
+                $interest = $nextinterest + ($rate * $amt);
             }
             $ttt = strtotime($investmentstartdate);
+            
             $dt = date('t-m-Y', strtotime('+'.$x.' month',$ttt));
+            
             $txndate = str_replace('-', '/', $dt);
-        
+
+        //     return $txndate;
+        // break;
+            
             $post = [
                 'savings_id' => request()->savings_id,
                 'transaction_date' => $txndate,
@@ -792,7 +1004,6 @@ public function calculateForStageFour(){
                 'transaction_amount' => round($interest, 2),
                 'transaction_description' => 'Interest Due on '.$txndate
             ];
-
             $url = "https://api-main.loandisk.com/3546/4110/saving_transaction";
             $curl = curl_init();
             curl_setopt_array($curl, array(
@@ -815,9 +1026,10 @@ public function calculateForStageFour(){
             $sdata = json_decode(curl_exec($curl), true); 
             $httpcode = curl_getinfo($curl, CURLINFO_HTTP_CODE);
             curl_close($curl);
+            
         }
-        
-        return $data;
+        $this->updatestage();
+       return response(['message'=>$data, 'status'=>'succcess'], 200);
     }
     public function singleSavings($savings_id){
         $url = "https://api-main.loandisk.com/3546/4110/saving/".$savings_id;
@@ -841,6 +1053,7 @@ public function calculateForStageFour(){
         $data = json_decode(curl_exec($curl), true); 
         $httpcode = curl_getinfo($curl, CURLINFO_HTTP_CODE);
         curl_close($curl);
+        $results = [];
         if(!empty($data['error'])){
             return response(['status' => 'Error','message' => 'result not found!'], 404);
         }
@@ -857,7 +1070,6 @@ public function calculateForStageFour(){
         usort($savings_transactions, function ($a, $b) {
             return strtotime(str_replace('/','-',$a['transaction_date'])) - strtotime(str_replace('/','-',$b['transaction_date']));
         });
-
         $fmttxn = array_map(function($a){
             return [
                 'date' => str_replace('-','/',$a['transaction_date'])." ".$a['transaction_time'],
@@ -868,8 +1080,9 @@ public function calculateForStageFour(){
                 'balance' => $a['transaction_balance']
             ];
         }, $savings_transactions);
-        
+        // return $results;
         $results['saving_transactions'] = $fmttxn;
+
         return $results;
     }
     public function changePassword(){
@@ -954,6 +1167,8 @@ public function calculateForStageFour(){
         return $deposits;
         
     }
+
+
     public function passwordChange(Request $request)
     {
         if(! $token = JWTAuth::getToken()){
@@ -1044,7 +1259,6 @@ public function calculateForStageFour(){
         $pre_data = $data['response']['Results']['0'];
         return $pre_data;
     }
-
     public function getSingleSavingsTransactionsTest(){
         $url = "https://api-main.loandisk.com/3546/4110/saving_transaction/saving/".request()->savings_id."/from/1/count/50";
         $curl = curl_init();
@@ -1167,4 +1381,24 @@ public function calculateForStageFour(){
     
         return $randomString; 
     } 
+    private function filterResource($request){
+
+        $query = Investmentstart::where('stage',6);
+        if(!$request->filled('stage')){
+            $per_page = 100;
+        }
+        $per_page = $request->page_size;
+        if ($request->filled('stage')) {
+            $query->where('stage', '=', $request->status);   
+        }
+        if($request->filled('from') && $request->filled('to')){
+            // $this->validateList();
+            $from = date($request->from);
+            $begin = date("Y-m-d",strtotime($from . ' -1 day'));
+            $to = date($request->to);
+            $end = date("Y-m-d",strtotime($to . ' +1 day'));
+            $query->whereBetween('created_at',[$begin,$end]);
+        }
+        return $query->paginate($per_page);
+    }
 }

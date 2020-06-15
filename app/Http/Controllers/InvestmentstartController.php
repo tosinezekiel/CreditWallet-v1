@@ -37,10 +37,11 @@ class InvestmentstartController extends Controller
             $istartdata['referal_code'] = request()->referal_code;
         }
         
+        $istartdata['stage'] = 0;
         $imergestart = Investmentstart::create($istartdata);
 
         
-        return response($imergestart);
+        return response(['data'=>$imergestart,'status'=>'success','message'=>'you have successfully started the investment'], 200);
     }
 
     public function initiate(){
@@ -73,16 +74,7 @@ class InvestmentstartController extends Controller
         $httpcode = curl_getinfo($curl, CURLINFO_HTTP_CODE);
         curl_close($curl);
         $results = [];
-        if(!empty($data['error'])){
-            return response(['status' => 'Error','message' => 'result not found!'], 404);
-        }
-        if(empty($data)){
-            return response(['status' => 'Error','message' => 'Bad Connection!'], 404); 
-        }
-        $savings_account = $data["response"]["Results"]["0"];
-        if($savings_account === null){
-            return response(['status' => 'Error','message' => 'result not found!'], 404);
-        }
+        $savings_account = $data['response']['Results']['0'];
 
         if($savings_account["savings_product_id"] == "717"){
             $irate = "3";
@@ -91,7 +83,7 @@ class InvestmentstartController extends Controller
         if($savings_account["savings_product_id"] == "2135"){
             $irate = "2.5";
         }
- 
+        
         if($savings_account["savings_product_id"] == "2157"){
             $irate = "2";
         }
@@ -106,6 +98,7 @@ class InvestmentstartController extends Controller
         $month = date("m",strtotime($investmentstartdate));
         $year = date("Y",strtotime($investmentstartdate));
         $daysinamonthone = cal_days_in_month(CAL_GREGORIAN,$month,$year);
+        // return "investmentstartdate: ".$investmentstartdate."  ,startdateenddate: ".$startdateenddate. ", actualtenor: " .$actualtenor.", daysinamonthone: ".$daysinamonthone;
         for($x=1; $x <= request()->duration; $x++){
             $date = date("Y-m-d");
             if($x == 1){
@@ -146,7 +139,7 @@ class InvestmentstartController extends Controller
                 );
             }
         }
-        return $history;
+        return response(['data'=>$history,'rate'=>$irate]);
         
     }
 

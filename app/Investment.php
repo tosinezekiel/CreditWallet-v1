@@ -16,7 +16,7 @@ class Investment extends Model
     protected $table = 'investment_login';
 
     protected $fillable = [
-        'email', 'username','borrower_id', 'password', 'first_login' 
+        'email', 'username','borrower_id', 'password','code'
     ];
 
     public function getRoleAttribute(){

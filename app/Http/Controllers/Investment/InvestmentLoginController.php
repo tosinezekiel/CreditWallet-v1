@@ -25,6 +25,7 @@ class InvestmentLoginController extends Controller
         }
         $hashedpassword = $this->getHashedPassword(request()->email);
         $investment = Investment::where('email',request()->email)->where('password',$hashedpassword)->first();
+        
         // check email on loan disk;
         if($this->checkEmailOnLoandDisk($investment->email)){
             return response(['message'=>'user email not found on loanDisk', 'Status'=>'error'], 404);

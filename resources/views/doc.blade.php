@@ -63,7 +63,7 @@
             </div>
             <div class="right-to-left">
                 <span class="left">Credit Wallet</span>
-                <span class="right">Date: 27/05/2020 <br>{{$fn}}</span>
+                <span class="right">Date: {{ date('F j, Y') }} <br>{{$fn}}</span>
             </div>
             <div class="clear"></div>
             <div class="simple-header">SAVINGS ACCOUNT</div>
@@ -89,7 +89,7 @@
                 
                 <tr>
                     <td align="center">{{ $savings_account['savings_account_number'] }}</td>
-                    <td align="center">{{ $savings_account['rate_per_annum'] }}</td>
+                    <td align="center">%{{ $savings_account['rate_per_annum'] }}</td>
                     <td align="center">{{ number_format($savings_account['savings_balance'],2)}}</td>
                     <td align="center">{{ number_format($savings_account['savings_balance'],2)}}</td>
                 </tr>

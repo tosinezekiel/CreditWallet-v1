@@ -19,7 +19,7 @@ class CreateInvestmentLoginTable extends Migration
             $table->string('username');
             $table->string('password');
             $table->string('borrower_id');
-            $table->bigInteger('first_login');
+            $table->string('code');
             $table->timestamps();
         });
     }
