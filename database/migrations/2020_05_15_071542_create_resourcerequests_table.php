@@ -16,8 +16,7 @@ class CreateResourcerequestsTable extends Migration
         Schema::create('resourcerequests', function (Blueprint $table) {
             $table->engine = 'InnoDB';
             $table->id();
-            $table->string('title');
-            $table->text('description');
+            $table->string('category');
             $table->string('type');
             $table->integer('amount')->nullable();
             $table->string('initial_approved_by')->nullable();

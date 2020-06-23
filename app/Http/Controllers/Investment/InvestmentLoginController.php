@@ -14,34 +14,69 @@ class InvestmentLoginController extends Controller
 {
     public function login(Request $request){
         
-        // $this->checkEmailOnLoandDisk();
-        $this->validateUsernameAndPassword();
-        
-        if(!Investment::where('email',$request->email)->exists()){
-            return response(['message'=>'invalid credential', 'Status'=>'error'], 401);
-        }
-        if(!$this->verifyUser(request()->email,request()->password)){
-            return response(['message'=>'invalid credentials', 'Status'=>'error'], 401);
-        }
-        $hashedpassword = $this->getHashedPassword(request()->email);
-        $investment = Investment::where('email',request()->email)->where('password',$hashedpassword)->first();
-        
         // check email on loan disk;
-        if($this->checkEmailOnLoandDisk($investment->email)){
-            return response(['message'=>'user email not found on loanDisk', 'Status'=>'error'], 404);
+        $url = "https://api-main.loandisk.com/3546/4110/borrower/borrower_email/".$request->email;
+        $curl = curl_init();
+        curl_setopt_array($curl, array(
+        CURLOPT_URL => $url,
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_ENCODING => "",
+        CURLOPT_MAXREDIRS => 10,
+        CURLOPT_TIMEOUT => 30,
+        CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+        CURLOPT_CUSTOMREQUEST => "GET",
+            CURLOPT_HTTPHEADER => array(
+                "accept: application/json",
+                "cache-control: no-cache",
+                "content-type: application/json",
+                "Authorization: Basic AkMbezWYERkE5NcDsXAM7YzkxDySG9amAKvajU9d"
+            ),
+        ));
+        curl_setopt($curl, CURLOPT_SSL_VERIFYPEER, true);
+        $data = json_decode(curl_exec($curl), true); 
+        $httpcode = curl_getinfo($curl, CURLINFO_HTTP_CODE);
+        curl_close($curl);
+        $borrower_id = $savings_no = $uniquenumber = "";
+        if(isset($data['error'])){
+            return response(['message'=> $data['error']['message'],'status'=>'error']);
         }
-        $customClaims = $this->createCustomClaims($investment);
+        if($data['http']["code"] == 200){
+            $resultObj =  $data['response']['Results']; 
+            $result = $resultObj[0]; 
+            if(empty($result)){
+                return response(['message'=> 'empty response','status'=>'error']);
+            }
 
-        $factory = JWTFactory::customClaims([
-            'sub'   => env('APP_KEY'),
-            'uuid' =>  $customClaims
-        ]);
+            $this->validateUsernameAndPassword();
+        
+            if(!Investment::where('email',$request->email)->exists()){
+                return response(['message'=>'invalid credential', 'status'=>'error'], 401);
+            }
+            if(!$this->verifyUser(request()->email,request()->password)){
+                return response(['message'=>'invalid credentials', 'status'=>'error'], 401);
+            }
+            $hashedpassword = $this->getHashedPassword(request()->email);
+            $investment = Investment::where('email',request()->email)->where('password',$hashedpassword)->first();
+            
+            //create token
+            
+            $customClaims = $this->createCustomClaims($investment);
 
-        $payload = $factory->make();
-        $token = JWTAuth::encode($payload);
+            $factory = JWTFactory::customClaims([
+                'sub'   => env('APP_KEY'),
+                'uuid' =>  $customClaims
+            ]);
 
-        return response(['data' => $investment, 'status' => 'success', 'token' => "{$token}"], 200);
+            $payload = $factory->make();
+            $token = JWTAuth::encode($payload);
 
+            $investment['borrower'] = $result;
+            return response(['data' => $investment, 'status' => 'success', 'token' => "{$token}"], 200);
+        }
+        $response['status'] = "error";
+        $response['data'] = $data;
+        $response['message'] = "Something went wrong, please try again but if problem persist, please contact our customer support team on support@creditwallet.ng";
+        echo json_encode($response);
     }
     public function forgotPassword(){
         //validate email address
@@ -119,9 +154,6 @@ class InvestmentLoginController extends Controller
         return JWTAuth::getPayload($token);
     }
     public function checkEmailOnLoandDisk($email){
-        // return false;
-        // return "hey";
-        //retrieving from loan disk using email;
         $url = "https://api-main.loandisk.com/3546/4110/borrower/borrower_email/".$email;
         $curl = curl_init();
         curl_setopt_array($curl, array(
@@ -144,11 +176,21 @@ class InvestmentLoginController extends Controller
         $httpcode = curl_getinfo($curl, CURLINFO_HTTP_CODE);
         curl_close($curl);
         $borrower_id = $savings_no = $uniquenumber = "";
-        // return json_decode(['data']);
         if(isset($data['error'])){
-            return true;
+            return response(['message'=> $data['error']['message'],'status'=>'error']);
         }
-        return false;
+        if($data['http']["code"] == 200){
+            $resultObj =  $data['response']['Results']; 
+            $result = $resultObj[0]; 
+            if(empty($result)){
+                return response(['message'=> 'empty response','status'=>'error']);
+            }
+            return $result;
+        }
+        $response['status'] = "error";
+        $response['data'] = $data;
+        $response['message'] = "Something went wrong, please try again but if problem persist, please contact our customer support team on support@creditwallet.ng";
+        echo json_encode($response);
     }
     public function getHashedPassword($username){
         $investment = Investment::whereEmail($username)->first();

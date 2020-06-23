@@ -17,9 +17,15 @@ class PDFController extends Controller
         $update = Investmentstart::where('id',request()->id)->first();
         
         $update->update(['stage'=> request()->stage]);
-        
+    }
 
-        // return response(['message'=>'stage successfully updated','status' => 'success'],200);
+    public function updatestatus(){
+        request()->validate([
+            "id" => "required"
+        ]);
+        $update = Investmentstart::where('id',request()->id)->first();
+        
+        $update->update(['status'=> 1]);
     }
     
     public function getnextinterest(){
@@ -231,6 +237,9 @@ class PDFController extends Controller
     public function generatePDF2(){
         // $fileurl = 'http://localhost:8000'.Storage::url('public/pdf/invoice.pdf');
         // return $fileurl;
+        if(!Investmentstart::where('id',request()->id)->where('stage',5)->exists()){
+            return response(['message'=>'stage passed','status'=>'success'], 200);
+        }
         date_default_timezone_set('Africa/Lagos');
         $new_array = [];
         $url = "https://api-main.loandisk.com/3546/4110/saving/".request()->savings_id;
@@ -366,7 +375,7 @@ class PDFController extends Controller
             $results = json_decode($response, true);
             $results['status'] = "success";
             $this->updatestage();
-            
+            $this->updatestatus();
             return $results;
 
     }

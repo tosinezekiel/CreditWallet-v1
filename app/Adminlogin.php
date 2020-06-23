@@ -22,7 +22,7 @@ class Adminlogin extends Model
         'authid', 'email', 'firstname', 'lastname', 'wavied', 'position', 'department', 'staff_id', 'v1_token', 'password', 'girotoken',
     ];
     protected $hidden = [
-        'authid', 'email', 'wavied', 'position', 'department', 'staff_id', 'v1_token', 'password', 'girotoken',
+        'wavied', 'position', 'department', 'staff_id', 'v1_token', 'password', 'girotoken',
     ]; 
 
     public function resourcerequest(){

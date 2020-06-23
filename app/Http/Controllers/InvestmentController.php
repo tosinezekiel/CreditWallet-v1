@@ -18,72 +18,40 @@ class InvestmentController extends Controller
      */
     public function index()
     {
-        $investmentstart = Investmentstart::all();
-        $results = [];
-        
-        foreach($investmentstart as $inv){
-            $url = "https://api-main.loandisk.com/3546/4110/saving/".$inv->savings_id;
-        $curl = curl_init();
-        curl_setopt_array($curl, array(
-        CURLOPT_URL => $url,
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_ENCODING => "",
-        CURLOPT_MAXREDIRS => 10,
-        CURLOPT_TIMEOUT => 30,
-        CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
-        CURLOPT_CUSTOMREQUEST => "GET",
-            CURLOPT_HTTPHEADER => array(
-                "accept: application/json",
-                "cache-control: no-cache",
-                "content-type: application/json",
-                "Authorization: Basic AkMbezWYERkE5NcDsXAM7YzkxDySG9amAKvajU9d"
-            ),
-        ));
-        curl_setopt($curl, CURLOPT_SSL_VERIFYPEER, true);
-        $data = json_decode(curl_exec($curl), true); 
-        $httpcode = curl_getinfo($curl, CURLINFO_HTTP_CODE);
-        curl_close($curl);
-        
-        if(!empty($data['error'])){
-            return response(['status' => 'Error','message' => 'result not found!'], 404);
-        }
-        if(empty($data)){
-            return response(['status' => 'Error','message' => 'Bad Connection!'], 404); 
-        }
-        $savings_account = $data["response"]["Results"]["0"];
-        if($savings_account === null){
-            return response(['status' => 'Error','message' => 'result not found!'], 404);
-        }
-        // return $savings_account['borrower_id'];
-        $url = "https://api-main.loandisk.com/3546/4110/borrower/".$savings_account['borrower_id'];
-        $curl = curl_init();
-        curl_setopt_array($curl, array(
-        CURLOPT_URL => $url,
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_ENCODING => "",
-        CURLOPT_MAXREDIRS => 10,
-        CURLOPT_TIMEOUT => 30,
-        CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
-        CURLOPT_CUSTOMREQUEST => "GET",
-            CURLOPT_HTTPHEADER => array(
-                "accept: application/json",
-                "cache-control: no-cache",
-                "content-type: application/json",
-                "Authorization: Basic AkMbezWYERkE5NcDsXAM7YzkxDySG9amAKvajU9d"
-            ),
-        ));
-        curl_setopt($curl, CURLOPT_SSL_VERIFYPEER, true);
-        $bordata = json_decode(curl_exec($curl), true); 
-        $httpcode = curl_getinfo($curl, CURLINFO_HTTP_CODE);
-        curl_close($curl);
-        $bbio = $bordata["response"]["Results"]["0"];
-            $inv['borrower'] = [];
-            $inv['borrower'] = $bbio;
-            array_push($results,$inv);
-        }
-        return response(['data'=>$results,'status'=>'success'], 200);
+        $new = Investmentstart::where('stage',0)->get();
+        $completed = Investmentstart::where('stage',6)->get();
+        $result = [];
+        $result['new'] = $new;
+        $result['completed'] = $completed;
+        return response(['data'=>$result,'status'=>'success'], 200);
     }
-    
+
+    public function listInvestment(Request $request){
+        request()->validate([
+            'page_size' => 'required'
+        ]);
+        $query = Investmentstart::query();
+        if(request()->filled('status')){
+            if(request()->status !== null){
+                $query->where('status',$request->status);
+            }
+        }
+        if(!empty(request()->searchtext)){
+            $query->where('firstname', 'LIKE', '%'.$request->searchtext.'%')
+            ->orWhere('lastname', 'LIKE', '%'.$request->searchtext.'%')
+            ->orWhere('savings_account_no', 'LIKE', '%'.$request->searchtext.'%');   
+        }
+        return $query->paginate(request()->page_size);
+        // if($request->filled('from') && $request->filled('to')){
+        //     // $this->validateList();
+        //     $from = date($request->from);
+        //     $begin = date("Y-m-d",strtotime($from . ' -1 day'));
+        //     $to = date($request->to);
+        //     $end = date("Y-m-d",strtotime($to . ' +1 day'));
+        //     $query->whereBetween('created_at',[$begin,$end]);
+        // }
+       
+    }    
     
     public function updatestage(){
         request()->validate([
@@ -277,8 +245,7 @@ class InvestmentController extends Controller
     
    
     public function savingsDashboard()
-    {
-        
+    {  
         $notification = array(
             'message' => "Due to the high volume of deposit investments that we have received recently, please note that we are currently not accepting deposit investments at this point. However, the investment platform will be available from 30th June, 2020. Thank you for choosing Princeps Credit Systems Limited",
             'status' => 0
@@ -477,7 +444,9 @@ class InvestmentController extends Controller
     
 
     public function deleteSavingsTransactionsOfOtherMonths(Request $request){
-        
+        if(!Investmentstart::where('id',request()->id)->where('stage',0)->exists()){
+            return response(['message'=>'stage passed','status'=>'success'], 200);
+        }
         date_default_timezone_set('Africa/Lagos');
         $url = "https://api-main.loandisk.com/3546/4110/saving/".request()->savings_id;
         $curl = curl_init();
@@ -581,13 +550,15 @@ class InvestmentController extends Controller
        return response(['message'=>'successfully Deleted', 'status'=>'succcess'], 200);
     }
     public function addtransaction(){
-        // $this->updatestage();
-        // return "true";
         request()->validate([
             'amount' => 'required|numeric',
             'investment_start_date' => 'date',
-            'savings_id' => 'required|numeric'
+            'savings_id' => 'required|numeric',
+            'id' => 'required'
         ]);
+        if(!Investmentstart::where('id',request()->id)->where('stage',1)->exists()){
+            return response(['message'=>'stage passed','status'=>'success'], 200);
+        }
         date_default_timezone_set('Africa/Lagos');
         $time = date('h:i A');
         // return $time;
@@ -632,17 +603,16 @@ class InvestmentController extends Controller
     }
 
     public function calculateThisMonthInterest(){
-        // $sn = Investmentstart::where('id',request()->id)->first();
-        // if($sn->stage !== request()->stage){
-        //   return response(['message'=>'kindly click on the right stage', 'status'=>'error'], 400);
-        // }
-        
         request()->validate([
             'amount' => 'required|numeric',
             'duration' => 'required|integer|min:6',
             'investment_start_date' => 'date',
-            'savings_id' => 'required|numeric'
+            'savings_id' => 'required|numeric',
+            'id' => 'required'
         ]);
+        if(!Investmentstart::where('id',request()->id)->where('stage',2)->exists()){
+            return response(['message'=>'stage passed','status'=>'success'], 200);
+        }
         $history=array();
         $url = "https://api-main.loandisk.com/3546/4110/saving/".request()->savings_id;
         $curl = curl_init();
@@ -751,15 +721,16 @@ class InvestmentController extends Controller
     }
 public function calculateForStageFour(){
     date_default_timezone_set('Africa/Lagos');
-    if(request()->stage !== 4){
-            return response(['message'=>'kindly click on the right stage', 'status'=>'error'], 400);
-        }
     request()->validate([
         'amount' => 'required|numeric',
         'duration' => 'required|integer|min:6',
         'investment_start_date' => 'date',
-        'savings_id' => 'required|numeric'
+        'savings_id' => 'required|numeric',
+        'id' => 'required'
     ]);
+    if(!Investmentstart::where('id',request()->id)->where('stage',3)->exists()){
+        return response(['message'=>'stage passed','status'=>'success'], 200);
+    }
     $url = "https://api-main.loandisk.com/3546/4110/saving/".request()->savings_id;
     $curl = curl_init();
     curl_setopt_array($curl, array(
@@ -821,6 +792,9 @@ public function calculateForStageFour(){
         $dto = date('d-m-Y', $new_mat_date);
         $matdate = str_replace('-', '/', $dto);
         // return $matdate;
+        if(!array_key_exists("custom_field_4709", $savings_account)){
+            $savings_account['custom_field_4709'] = 0;
+        }
         $update =  [
             "savings_id" => $savings_account['savings_id'],
             "savings_product_id" => $savings_account['savings_product_id'],
@@ -866,8 +840,12 @@ public function calculateForStageFour(){
             'amount' => 'required|integer',
             'duration' => 'required|integer|min:6',
             'investment_start_date' => 'date',
-            'savings_id' => 'required|numeric'
+            'savings_id' => 'required|numeric',
+            'id' => 'required'
         ]);
+        if(!Investmentstart::where('id',request()->id)->where('stage',4)->exists()){
+            return response(['message'=>'stage passed','status'=>'success'], 200);
+        }
         $investmentstartdate = request()->investment_start_date;
         $nextinterest = $this->getnextinterest();
         // return $td;
@@ -1384,8 +1362,8 @@ public function calculateForStageFour(){
     private function filterResource($request){
 
         $query = Investmentstart::where('stage',6);
-        if(!$request->filled('stage')){
-            $per_page = 100;
+        if(!$request->filled('per_page')){
+            $per_page = 10;
         }
         $per_page = $request->page_size;
         if ($request->filled('stage')) {

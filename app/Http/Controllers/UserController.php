@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Hash;
 use App\User;
+use App\Adminlogin;
 use Carbon\Carbon;
 use JWTAuth;
 use Tymon\JWTAuth\Facades\JWTFactory;
@@ -13,6 +14,10 @@ use Illuminate\Http\Request;
 
 class UserController extends Controller
 {
+    public function index(){
+        $users = Adminlogin::all();
+        return response(['data'=>$users,'status'=>'success'], 200);
+    }
     public function checkToken(){
         try {
 

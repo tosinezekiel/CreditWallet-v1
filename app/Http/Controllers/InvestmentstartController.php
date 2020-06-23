@@ -28,7 +28,11 @@ class InvestmentstartController extends Controller
             'amount' => 'required|integer',
             'duration' => 'required|integer|min:6',
             'investment_start_date' => 'date',
-            'savings_id' => 'required|numeric'
+            'savings_id' => 'required|numeric',
+            'firstname' => 'required',
+            'lastname' => 'required',
+            'savings_account_no' => 'required',
+            'unique_number' => 'required'
         ]);
         if(request()->filled('referal_code')){
             request()->validate([
@@ -36,11 +40,9 @@ class InvestmentstartController extends Controller
             ]);
             $istartdata['referal_code'] = request()->referal_code;
         }
-        
         $istartdata['stage'] = 0;
         $imergestart = Investmentstart::create($istartdata);
 
-        
         return response(['data'=>$imergestart,'status'=>'success','message'=>'you have successfully started the investment'], 200);
     }
 
@@ -49,8 +51,13 @@ class InvestmentstartController extends Controller
             'amount' => 'required|integer',
             'duration' => 'required|integer|min:6',
             'investment_start_date' => 'date',
-            'savings_id' => 'required|numeric'
+            'savings_id' => 'required|numeric',
+            'firstname' => 'required',
+            'lastname' => 'required',
+            'savings_account_no' => 'required',
+            'unique_number' => 'required'
         ]);
+        
         $history=array();
         $url = "https://api-main.loandisk.com/3546/4110/saving/".request()->savings_id;
         $curl = curl_init();

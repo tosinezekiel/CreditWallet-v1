@@ -16,14 +16,6 @@ class ResourcerequestController extends Controller
         $data = $this->filterResource($request);
         return response(['data' => $data,'status' => 'success'], 200); 
     }
-    // public function testmail(){
-    //     request()->validate([
-    //         'id' => 'required'
-    //     ]);
-
-    //     $res = Resourcerequest::whereId(request()->id)->first();
-    //     return $res->creator->email;
-    // }
     public function awaiting(Request $request){
         
         $data = Resourcerequest::where('status',0)->get();
@@ -120,10 +112,12 @@ class ResourcerequestController extends Controller
     public function approve(Request $request){
         $apy = $this->getTokensPayload();
         $uuid = $apy['uuid'];
+        
         $request->validate([
             'amount' => 'required',
             'id' => 'required'
         ]);
+
         $now = date("Y-m-d H:i:s");
         $resourcerequest = Resourcerequest::where('id',$request->id)->first();
         $resourcerequest->update(['status'=>1, 'final_approved_by' => $uuid->authid, 'final_approved_date' => $now, 'amount'=>$request->amount]);
@@ -138,22 +132,22 @@ class ResourcerequestController extends Controller
             'subject'=> $subject,
             'html'=> $html,
             'h:Reply-To'=> $replyto
-        );
-        $session = curl_init(env('MAILGUN_URL').'/messages');
-        curl_setopt($session, CURLOPT_HTTPAUTH, CURLAUTH_BASIC);
-        curl_setopt($session, CURLOPT_USERPWD, 'api:'.env('MAILGUN_KEY'));
-        curl_setopt($session, CURLOPT_POST, true);
-        curl_setopt($session, CURLOPT_POSTFIELDS, $array_data);
-        curl_setopt($session, CURLOPT_HEADER, false);
-        curl_setopt($session, CURLOPT_ENCODING, 'UTF-8');
-        curl_setopt($session, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($session, CURLOPT_SSL_VERIFYPEER, false);
-        $response = curl_exec($session);
-        curl_close($session);
-        $results = json_decode($response, true);
-        $results['message'] = "resource request approved successfully";
-        $results['status'] = "success";
-        return $results;
+            );
+            $session = curl_init(env('MAILGUN_URL').'/messages');
+            curl_setopt($session, CURLOPT_HTTPAUTH, CURLAUTH_BASIC);
+            curl_setopt($session, CURLOPT_USERPWD, 'api:'.env('MAILGUN_KEY'));
+            curl_setopt($session, CURLOPT_POST, true);
+            curl_setopt($session, CURLOPT_POSTFIELDS, $array_data);
+            curl_setopt($session, CURLOPT_HEADER, false);
+            curl_setopt($session, CURLOPT_ENCODING, 'UTF-8');
+            curl_setopt($session, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($session, CURLOPT_SSL_VERIFYPEER, false);
+            $response = curl_exec($session);
+            curl_close($session);
+            $results = json_decode($response, true);
+            $results['message'] = "resource request approved successfully";
+            $results['status'] = "success";
+            return $results;
     }
     
 
@@ -188,6 +182,7 @@ public function ResourceRequestEmail ($name, $message, $email, $department) {
     }
 
     public function ResourceRequestEmailForRejection($name, $reasons, $email, $department) {
+
         $template = "
             <!DOCTYPE html>
             <html>
@@ -220,55 +215,31 @@ public function ResourceRequestEmail ($name, $message, $email, $department) {
 
     private function filterResource($request){
 
-        request()->validate([
-            'page_size' => 'required'
-        ]);
+        $query = Resourcerequest::with('creator');
 
-        $query = Resourcerequest::query();
-        if(request()->filled('status')){
-            if(request()->status !== null){
-                $query->where('status',$request->status);
-            }
+        if ($request->filled('status')) {
+            $query->where('status', '=', $request->status);   
         }
-        // if(!empty(request()->searchtext)){
-        //     $query->where('firstname', 'LIKE', '%'.$request->searchtext.'%')
-        //     ->orWhere('lastname', 'LIKE', '%'.$request->searchtext.'%')
-        //     ->orWhere('savings_account_no', 'LIKE', '%'.$request->searchtext.'%');   
-        // }
-        if ($request->filled('status') ) {
-            if(request()->type !== null){
-                $query->where('status', '=', $request->status); 
-            }
+        if ($request->filled('title') ) {
+            $query->where('title', '=', $request->title);
+            
         }
-        if ($request->filled('amount') ) {
-            if(request()->type !== null){
-                $query->where('amount', '=', $request->amount); 
-            }
-        }
-        if ($request->filled('type') ) {
-            if(request()->type !== null){
-                $query->where('type', '=', $request->type); 
-            }
-        }
-        if ($request->filled('category') ){
-            if(request()->category !== null){
-                $query->where('category', '=', $request->category);
-            }
+        if ($request->filled('description') ) {
+            $query->where('description', '=', $request->description);
         }
         if($request->filled('authid')){
-            if(request()->authid !== null){
-                $query->where('authid', '=', $request->authid);
-            }
+            $query->creator()->where('authid', '=', $request->authid);
+        }
+        if($request->filled('type')){
+            $query->where('type', '=', $request->type);
         }
         if($request->filled('from') && $request->filled('to')){
-            if(request()->from !== null && request()->from !== null){
-                $this->validateList();
-                $from = date($request->from);
-                $begin = date("Y-m-d",strtotime($from . ' -1 day'));
-                $to = date($request->to);
-                $end = date("Y-m-d",strtotime($to . ' +1 day'));
-                $query->whereBetween('created_at',[$begin,$end]);
-            }
+            $this->validateList();
+            $from = date($request->from);
+            $begin = date("Y-m-d",strtotime($from . ' -1 day'));
+            $to = date($request->to);
+            $end = date("Y-m-d",strtotime($to . ' +1 day'));
+            $query->whereBetween('created_at',[$begin,$end]);
         }
         return $query->paginate($request->page_size);
     }
@@ -338,9 +309,9 @@ public function ResourceRequestEmail ($name, $message, $email, $department) {
 
     private function validateStore()
     {
-        return request()->validate([
+       return request()->validate([
             'category'  => 'required|string',
-            'type'  => 'required|string'
+            'type'  => 'required'
         ]);
     }
     private function validateMessage()
